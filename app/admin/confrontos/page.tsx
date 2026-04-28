@@ -104,9 +104,41 @@ export default function AdminConfrontos() {
     }
   }
 
+  async function cancelarNoite() {
+    if (!noiteId) return
+    if (!confirm('Tem certeza? Isso vai apagar todos os confrontos e pontos desta noite.')) return
+    await supabase.from('pontuacoes').delete().eq('noite_id', noiteId)
+    await supabase.from('confrontos').delete().eq('noite_id', noiteId)
+    await supabase.from('noites').delete().eq('id', noiteId)
+    setConfrontos([])
+    setNoiteId(null)
+    setFaseAtual('')
+    setEtapa('config')
+    setMcA(null); setMcB(null); setPlacar(''); setVencedor(''); setSearchA(''); setSearchB('')
+  }
+
+  async function desfazerUltimo() {
+    if (confrontos.length === 0) return
+    const ultimo = confrontos[confrontos.length - 1]
+    
+    // Deleta pontuação e confronto do último
+    await supabase.from('pontuacoes').delete().eq('confronto_id', ultimo.confronto_id)
+    await supabase.from('confrontos').delete().eq('id', ultimo.confronto_id)
+
+    const novosConfrontos = confrontos.slice(0, -1)
+    setConfrontos(novosConfrontos)
+
+    // Volta para a fase correta
+    const fases = getFases()
+    const confrontosDaFase = novosConfrontos.filter(c => c.fase === ultimo.fase)
+    if (confrontosDaFase.length < getMatchesPorFase(ultimo.fase)) {
+      setFaseAtual(ultimo.fase)
+    }
+
+    setMcA(null); setMcB(null); setPlacar(''); setVencedor(''); setSearchA(''); setSearchB('')
+  }
+
   async function criarMcNoBanco(nome: string) {
-    const palette = [['#E1F5EE','#085041'],['#E6F1FB','#0C447C'],['#FAEEDA','#633806'],['#FBEAF0','#72243E'],['#FAECE7','#4A1B0C'],['#EAF3DE','#173404']]
-    const c = palette[Math.floor(Math.random() * palette.length)]
     const { data, error } = await supabase.from('mcs').insert({
       nome_completo: nome,
       nome_artistico: nome,
@@ -114,7 +146,7 @@ export default function AdminConfrontos() {
       cidade: 'São Paulo',
       estado: 'SP',
       whatsapp: '',
-      email: `${nome.toLowerCase().replace(/\s/g, '')}@ligacentral.com`,
+      email: `${nome.toLowerCase().replace(/\s/g,'').replace(/[^a-z0-9]/g,'')}${Date.now()}@ligacentral.com`,
       aceite_termos: false,
     }).select().single()
     if (error) { setErro('Erro ao criar MC: ' + error.message); return null }
@@ -130,7 +162,7 @@ export default function AdminConfrontos() {
     const lavada = isLavada(placar)
     const pontos = getPontos(faseAtual) + (lavada ? 1 : 0)
 
-    const { data: conf } = await supabase.from('confrontos').insert({
+    const { data: conf, error: confError } = await supabase.from('confrontos').insert({
       noite_id: noiteId,
       fase: faseAtual,
       mc_a_id: mcA.id,
@@ -140,6 +172,8 @@ export default function AdminConfrontos() {
       vencedor_id: vencedorMc.id,
       lavada,
     }).select().single()
+
+    if (confError) { setErro('Erro ao salvar confronto: ' + confError.message); setSalvando(false); return }
 
     if (conf) {
       await supabase.from('pontuacoes').insert({
@@ -151,7 +185,7 @@ export default function AdminConfrontos() {
         bonus_lavada: lavada,
       })
 
-      const novoConfronto = { fase: faseAtual, mcA, mcB, placar, vencedor: vencedorMc, pontos, lavada }
+      const novoConfronto = { confronto_id: conf.id, fase: faseAtual, mcA, mcB, placar, vencedor: vencedorMc, pontos, lavada }
       const novosConfrontos = [...confrontos, novoConfronto]
       setConfrontos(novosConfrontos)
 
@@ -179,9 +213,16 @@ export default function AdminConfrontos() {
   return (
     <main className="min-h-screen bg-zinc-950 text-white px-4 py-8">
       <div className="max-w-lg mx-auto">
-        <div className="flex items-center gap-4 mb-8">
-          <Link href="/admin/dashboard" className="text-zinc-500 hover:text-white text-sm transition-colors">← voltar</Link>
-          <h1 className="text-xl font-bold">Cadastrar confrontos</h1>
+        <div className="flex items-center justify-between mb-8">
+          <div className="flex items-center gap-4">
+            <Link href="/admin/dashboard" className="text-zinc-500 hover:text-white text-sm transition-colors">← voltar</Link>
+            <h1 className="text-xl font-bold">Cadastrar confrontos</h1>
+          </div>
+          {etapa === 'confrontos' && (
+            <button onClick={cancelarNoite} className="text-red-400 hover:text-red-300 text-sm transition-colors">
+              Cancelar tudo
+            </button>
+          )}
         </div>
 
         {sucesso && <div className="bg-emerald-500/10 border border-emerald-500/20 rounded-xl p-4 mb-6 text-emerald-400 text-sm">{sucesso}</div>}
@@ -240,7 +281,6 @@ export default function AdminConfrontos() {
               <span className="text-zinc-500 text-xs">{confrontos.filter(c => c.fase === faseAtual).length}/{getMatchesPorFase(faseAtual)} confrontos</span>
             </div>
 
-            {/* MC A */}
             <div>
               <label className="text-sm text-zinc-400 block mb-1">MC A</label>
               <input
@@ -272,7 +312,6 @@ export default function AdminConfrontos() {
               {mcA && <p className="text-emerald-400 text-xs mt-1">✓ {mcA.nome_artistico}</p>}
             </div>
 
-            {/* MC B */}
             <div>
               <label className="text-sm text-zinc-400 block mb-1">MC B</label>
               <input
@@ -336,12 +375,17 @@ export default function AdminConfrontos() {
 
             {confrontos.length > 0 && (
               <div className="mt-2">
-                <p className="text-zinc-500 text-xs uppercase tracking-wider mb-2">Registrados</p>
+                <div className="flex items-center justify-between mb-2">
+                  <p className="text-zinc-500 text-xs uppercase tracking-wider">Registrados</p>
+                  <button onClick={desfazerUltimo} className="text-amber-400 hover:text-amber-300 text-xs transition-colors">
+                    ↩ Desfazer último
+                  </button>
+                </div>
                 {confrontos.map((c, i) => (
                   <div key={i} className="flex items-center justify-between py-2 border-b border-zinc-800 text-sm">
                     <span className="text-zinc-400 text-xs">{faseLabel[c.fase]}</span>
                     <span><span className="text-emerald-400 font-medium">{c.vencedor.nome_artistico}</span> def. {c.vencedor.id === c.mcA.id ? c.mcB.nome_artistico : c.mcA.nome_artistico}</span>
-                    <span className="text-zinc-500">{c.placar}</span>
+                    <span className="text-zinc-500">{c.placar}{c.lavada ? ' 🔥' : ''}</span>
                   </div>
                 ))}
               </div>
