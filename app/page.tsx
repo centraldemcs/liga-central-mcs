@@ -17,13 +17,13 @@ export default function Home() {
           href="/mc/login"
           className="flex-1 bg-emerald-500 hover:bg-emerald-400 text-black font-semibold py-3 px-6 rounded-lg text-center transition-colors"
         >
-          Sou MC
+          Login MC
         </Link>
         <Link
           href="/batalha/login"
           className="flex-1 bg-zinc-800 hover:bg-zinc-700 text-white font-semibold py-3 px-6 rounded-lg text-center transition-colors"
         >
-          Sou Batalha
+          Login Organizador de Batalha
         </Link>
       </div>
 
