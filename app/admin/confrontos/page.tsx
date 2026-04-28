@@ -70,19 +70,29 @@ export default function AdminConfrontos() {
     return p === '2x0' || p === '3x0'
   }
 
-  function getPontos(fase: string) {
+  // Pontos para o PERDEDOR de cada fase
+  function getPontosLoser(fase: string) {
     if (form.vagas === 16) {
-      if (fase === 'oitavas') return 1
-      if (fase === 'quartas') return 3
-      if (fase === 'semifinal') return 5
-      return 7
-    }
-    if (form.vagas === 8) {
+      if (fase === 'oitavas') return 0
       if (fase === 'quartas') return 1
       if (fase === 'semifinal') return 3
-      return 5
+      if (fase === 'final') return 5
     }
-    if (fase === 'semifinal') return 1
+    if (form.vagas === 8) {
+      if (fase === 'quartas') return 0
+      if (fase === 'semifinal') return 1
+      if (fase === 'final') return 3
+    }
+    // vagas === 4
+    if (fase === 'semifinal') return 0
+    if (fase === 'final') return 1
+    return 0
+  }
+
+  // Pontos para o VENCEDOR da final
+  function getPontosWinner() {
+    if (form.vagas === 16) return 7
+    if (form.vagas === 8) return 5
     return 3
   }
 
@@ -120,21 +130,11 @@ export default function AdminConfrontos() {
   async function desfazerUltimo() {
     if (confrontos.length === 0) return
     const ultimo = confrontos[confrontos.length - 1]
-    
-    // Deleta pontuação e confronto do último
     await supabase.from('pontuacoes').delete().eq('confronto_id', ultimo.confronto_id)
     await supabase.from('confrontos').delete().eq('id', ultimo.confronto_id)
-
     const novosConfrontos = confrontos.slice(0, -1)
     setConfrontos(novosConfrontos)
-
-    // Volta para a fase correta
-    const fases = getFases()
-    const confrontosDaFase = novosConfrontos.filter(c => c.fase === ultimo.fase)
-    if (confrontosDaFase.length < getMatchesPorFase(ultimo.fase)) {
-      setFaseAtual(ultimo.fase)
-    }
-
+    setFaseAtual(ultimo.fase)
     setMcA(null); setMcB(null); setPlacar(''); setVencedor(''); setSearchA(''); setSearchB('')
   }
 
@@ -158,9 +158,11 @@ export default function AdminConfrontos() {
     if (!mcA || !mcB || !placar || !vencedor) { setErro('Preencha todos os campos do confronto.'); return }
     setSalvando(true)
     setErro('')
+
     const vencedorMc = vencedor === 'a' ? mcA : mcB
+    const perdedorMc = vencedor === 'a' ? mcB : mcA
     const lavada = isLavada(placar)
-    const pontos = getPontos(faseAtual) + (lavada ? 1 : 0)
+    const isFinal = faseAtual === 'final'
 
     const { data: conf, error: confError } = await supabase.from('confrontos').insert({
       noite_id: noiteId,
@@ -173,19 +175,64 @@ export default function AdminConfrontos() {
       lavada,
     }).select().single()
 
-    if (confError) { setErro('Erro ao salvar confronto: ' + confError.message); setSalvando(false); return }
+    if (confError) { setErro('Erro: ' + confError.message); setSalvando(false); return }
 
     if (conf) {
-      await supabase.from('pontuacoes').insert({
-        mc_id: vencedorMc.id,
-        confronto_id: conf.id,
-        noite_id: noiteId,
-        batalha_id: form.batalha_id,
-        pontos,
-        bonus_lavada: lavada,
-      })
+      const pontuacoesParaInserir = []
 
-      const novoConfronto = { confronto_id: conf.id, fase: faseAtual, mcA, mcB, placar, vencedor: vencedorMc, pontos, lavada }
+      // Perdedor recebe pontos pela fase que saiu
+      const ptsPerdedor = getPontosLoser(faseAtual)
+      const ptsBonusPerdedor = lavada ? 1 : 0 // bônus vai para o vencedor, não perdedor
+
+      if (ptsPerdedor > 0) {
+        pontuacoesParaInserir.push({
+          mc_id: perdedorMc.id,
+          confronto_id: conf.id,
+          noite_id: noiteId,
+          batalha_id: form.batalha_id,
+          pontos: ptsPerdedor,
+          bonus_lavada: false,
+        })
+      }
+
+      // Se for a final, vencedor recebe pontos de campeão + bônus lavada
+      if (isFinal) {
+        const ptsVencedor = getPontosWinner() + (lavada ? 1 : 0)
+        pontuacoesParaInserir.push({
+          mc_id: vencedorMc.id,
+          confronto_id: conf.id,
+          noite_id: noiteId,
+          batalha_id: form.batalha_id,
+          pontos: ptsVencedor,
+          bonus_lavada: lavada,
+        })
+      } else if (lavada) {
+        // Fora da final, bônus de lavada vai para o vencedor
+        pontuacoesParaInserir.push({
+          mc_id: vencedorMc.id,
+          confronto_id: conf.id,
+          noite_id: noiteId,
+          batalha_id: form.batalha_id,
+          pontos: 1,
+          bonus_lavada: true,
+        })
+      }
+
+      if (pontuacoesParaInserir.length > 0) {
+        await supabase.from('pontuacoes').insert(pontuacoesParaInserir)
+      }
+
+      const novoConfronto = {
+        confronto_id: conf.id,
+        fase: faseAtual,
+        mcA, mcB, placar,
+        vencedor: vencedorMc,
+        perdedor: perdedorMc,
+        ptsPerdedor,
+        ptsVencedor: isFinal ? getPontosWinner() + (lavada ? 1 : 0) : (lavada ? 1 : 0),
+        lavada
+      }
+
       const novosConfrontos = [...confrontos, novoConfronto]
       setConfrontos(novosConfrontos)
 
@@ -196,7 +243,10 @@ export default function AdminConfrontos() {
       if (confrontosDaFase.length >= totalFase) {
         const proxIdx = fases.indexOf(faseAtual) + 1
         if (proxIdx < fases.length) setFaseAtual(fases[proxIdx])
-        else { setSucesso('Batalha encerrada! Todos os confrontos foram registrados.'); setEtapa('config') }
+        else {
+          setSucesso('Batalha encerrada! Todos os confrontos foram registrados.')
+          setEtapa('config')
+        }
       }
 
       setMcA(null); setMcB(null); setPlacar(''); setVencedor(''); setSearchA(''); setSearchB('')
@@ -384,7 +434,11 @@ export default function AdminConfrontos() {
                 {confrontos.map((c, i) => (
                   <div key={i} className="flex items-center justify-between py-2 border-b border-zinc-800 text-sm">
                     <span className="text-zinc-400 text-xs">{faseLabel[c.fase]}</span>
-                    <span><span className="text-emerald-400 font-medium">{c.vencedor.nome_artistico}</span> def. {c.vencedor.id === c.mcA.id ? c.mcB.nome_artistico : c.mcA.nome_artistico}</span>
+                    <span>
+                      <span className="text-emerald-400 font-medium">{c.vencedor.nome_artistico}</span>
+                      {' '}def.{' '}
+                      {c.perdedor.nome_artistico}
+                    </span>
                     <span className="text-zinc-500">{c.placar}{c.lavada ? ' 🔥' : ''}</span>
                   </div>
                 ))}
