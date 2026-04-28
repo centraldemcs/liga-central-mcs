@@ -62,27 +62,62 @@ export default function CadastroMC() {
       return
     }
 
-    const { error: mcError } = await supabase
+    // Verifica se já existe MC com esse nome artístico no banco
+    const { data: mcExistente } = await supabase
       .from('mcs')
-      .insert({
-        profile_id: data.user.id,
-        nome_completo: form.nome_completo,
-        nome_artistico: form.nome_artistico,
-        data_nascimento: form.data_nascimento,
-        whatsapp: form.whatsapp,
-        email: form.email,
-        cidade: form.cidade,
-        estado: form.estado,
-        spotify_url: form.sem_spotify ? null : form.spotify_url,
-        aceite_termos: form.aceite_termos,
-        opt_in_email: form.opt_in_email,
-        opt_in_whatsapp: form.opt_in_whatsapp,
-      })
+      .select('id, nome_artistico')
+      .ilike('nome_artistico', form.nome_artistico.trim())
+      .is('profile_id', null)
+      .single()
 
-    if (mcError) {
-      setErro('Erro ao salvar dados do MC.')
-      setLoading(false)
-      return
+    if (mcExistente) {
+      // Vincula o perfil ao MC existente e atualiza os dados
+      const { error: updateError } = await supabase
+        .from('mcs')
+        .update({
+          profile_id: data.user.id,
+          nome_completo: form.nome_completo,
+          data_nascimento: form.data_nascimento,
+          whatsapp: form.whatsapp,
+          email: form.email,
+          cidade: form.cidade,
+          estado: form.estado,
+          spotify_url: form.sem_spotify ? null : form.spotify_url,
+          aceite_termos: form.aceite_termos,
+          opt_in_email: form.opt_in_email,
+          opt_in_whatsapp: form.opt_in_whatsapp,
+        })
+        .eq('id', mcExistente.id)
+
+      if (updateError) {
+        setErro('Erro ao vincular perfil existente.')
+        setLoading(false)
+        return
+      }
+    } else {
+      // Cria novo MC do zero
+      const { error: mcError } = await supabase
+        .from('mcs')
+        .insert({
+          profile_id: data.user.id,
+          nome_completo: form.nome_completo,
+          nome_artistico: form.nome_artistico,
+          data_nascimento: form.data_nascimento,
+          whatsapp: form.whatsapp,
+          email: form.email,
+          cidade: form.cidade,
+          estado: form.estado,
+          spotify_url: form.sem_spotify ? null : form.spotify_url,
+          aceite_termos: form.aceite_termos,
+          opt_in_email: form.opt_in_email,
+          opt_in_whatsapp: form.opt_in_whatsapp,
+        })
+
+      if (mcError) {
+        setErro('Erro ao salvar dados do MC.')
+        setLoading(false)
+        return
+      }
     }
 
     router.push('/mc/dashboard')
@@ -114,7 +149,7 @@ export default function CadastroMC() {
             </div>
             <div>
               <label className="text-sm text-zinc-400 block mb-1">Nome artístico</label>
-              <input className={inputClass} value={form.nome_artistico} onChange={e => set('nome_artistico', e.target.value)} placeholder="Como você é conhecido" />
+              <input className={inputClass} value={form.nome_artistico} onChange={e => set('nome_artistico', e.target.value)} placeholder="Como você é conhecido na Liga" />
             </div>
             <div>
               <label className="text-sm text-zinc-400 block mb-1">Data de nascimento</label>
