@@ -1,0 +1,291 @@
+'use client'
+import { useEffect, useState } from 'react'
+import { createClient } from '@/lib/supabase'
+import { useRouter } from 'next/navigation'
+import Link from 'next/link'
+
+export default function Adminconfrontos() {
+  const [batalhas, setBatalhas] = useState<any[]>([])
+  const [mcs, setMcs] = useState<any[]>([])
+  const [loading, setLoading] = useState(true)
+  const [salvando, setSalvando] = useState(false)
+  const [sucesso, setSucesso] = useState('')
+  const [erro, setErro] = useState('')
+  const router = useRouter()
+  const supabase = createClient()
+
+  const [form, setForm] = useState({
+    batalha_id: '',
+    data: '',
+    formato: '1x1',
+    vagas: 8,
+    rounds: 3,
+  })
+
+  const [confrontos, setConfrontos] = useState<any[]>([])
+  const [faseAtual, setFaseAtual] = useState('')
+  const [mcA, setMcA] = useState<any>(null)
+  const [mcB, setMcB] = useState<any>(null)
+  const [placar, setPlacar] = useState('')
+  const [vencedor, setVencedor] = useState('')
+  const [searchA, setSearchA] = useState('')
+  const [searchB, setSearchB] = useState('')
+  const [noiteId, setNoiteId] = useState<string | null>(null)
+  const [etapa, setEtapa] = useState<'config' | 'confrontos'>('config')
+
+  useEffect(() => {
+    async function load() {
+      const { data: { user } } = await supabase.auth.getUser()
+      if (!user) { router.push('/admin/login'); return }
+      const { data: profile } = await supabase.from('profiles').select('tipo').eq('id', user.id).single()
+      if (profile?.tipo !== 'admin') { router.push('/'); return }
+      const { data: bats } = await supabase.from('batalhas').select('id, nome, cidade').eq('status', 'aprovada')
+      const { data: mcList } = await supabase.from('mcs').select('id, nome_artistico, cidade')
+      setBatalhas(bats || [])
+      setMcs(mcList || [])
+      setLoading(false)
+    }
+    load()
+  }, [])
+
+  function getFases() {
+    if (form.vagas === 16) return ['oitavas', 'quartas', 'semifinal', 'final']
+    if (form.vagas === 8) return ['quartas', 'semifinal', 'final']
+    return ['semifinal', 'final']
+  }
+
+  function getMatchesPorFase(fase: string) {
+    if (fase === 'oitavas') return 8
+    if (fase === 'quartas') return 4
+    if (fase === 'semifinal') return 2
+    return 1
+  }
+
+  function getPlacaresValidos() {
+    if (form.rounds === 3) return ['2x0', '2x1']
+    return ['3x0', '3x1', '3x2']
+  }
+
+  function isLavada(p: string) {
+    return p === '2x0' || p === '3x0'
+  }
+
+  function getPontos(fase: string) {
+    if (form.vagas === 16) {
+      if (fase === 'oitavas') return 1
+      if (fase === 'quartas') return 3
+      if (fase === 'semifinal') return 5
+      return 7
+    }
+    if (form.vagas === 8) {
+      if (fase === 'quartas') return 1
+      if (fase === 'semifinal') return 3
+      return 5
+    }
+    if (fase === 'semifinal') return 1
+    return 3
+  }
+
+  async function criarNoite() {
+    if (!form.batalha_id || !form.data) { setErro('Preencha todos os campos.'); return }
+    setErro('')
+    const { data } = await supabase.from('noites').insert({
+      batalha_id: form.batalha_id,
+      data: form.data,
+      formato: form.formato,
+      vagas: form.vagas,
+      rounds: form.rounds,
+    }).select().single()
+    if (data) {
+      setNoiteId(data.id)
+      setFaseAtual(getFases()[0])
+      setEtapa('confrontos')
+    }
+  }
+
+  async function salvarConfronto() {
+    if (!mcA || !mcB || !placar || !vencedor) { setErro('Preencha todos os campos do confronto.'); return }
+    setSalvando(true)
+    setErro('')
+    const vencedorMc = vencedor === 'a' ? mcA : mcB
+    const perdedorMc = vencedor === 'a' ? mcB : mcA
+    const lavada = isLavada(placar)
+    const pontos = getPontos(faseAtual) + (lavada ? 1 : 0)
+
+    const { data: conf } = await supabase.from('confrontos').insert({
+      noite_id: noiteId,
+      fase: faseAtual,
+      mc_a_id: mcA.id,
+      mc_b_id: mcB.id,
+      placar,
+      rounds: form.rounds,
+      vencedor_id: vencedorMc.id,
+      lavada,
+    }).select().single()
+
+    if (conf) {
+      await supabase.from('pontuacoes').insert({
+        mc_id: vencedorMc.id,
+        confronto_id: conf.id,
+        noite_id: noiteId,
+        batalha_id: form.batalha_id,
+        pontos,
+        bonus_lavada: lavada,
+      })
+
+      const novoConfronto = { fase: faseAtual, mcA, mcB, placar, vencedor: vencedorMc, pontos, lavada }
+      const novosConfrontos = [...confrontos, novoConfronto]
+      setConfrontos(novosConfrontos)
+
+      const fases = getFases()
+      const confrontosDaFase = novosConfrontos.filter(c => c.fase === faseAtual)
+      const totalFase = getMatchesPorFase(faseAtual)
+
+      if (confrontosDaFase.length >= totalFase) {
+        const proxIdx = fases.indexOf(faseAtual) + 1
+        if (proxIdx < fases.length) setFaseAtual(fases[proxIdx])
+        else { setSucesso('Batalha encerrada! Todos os confrontos foram registrados.'); setEtapa('config') }
+      }
+
+      setMcA(null); setMcB(null); setPlacar(''); setVencedor(''); setSearchA(''); setSearchB('')
+    }
+    setSalvando(false)
+  }
+
+  const mcsFiltradosA = mcs.filter(m => m.nome_artistico.toLowerCase().includes(searchA.toLowerCase()) && m.id !== mcB?.id)
+  const mcsFiltradosB = mcs.filter(m => m.nome_artistico.toLowerCase().includes(searchB.toLowerCase()) && m.id !== mcA?.id)
+  const faseLabel: any = { oitavas: 'Oitavas de final', quartas: 'Quartas de final', semifinal: 'Semifinal', final: 'Final' }
+
+  if (loading) return <main className="min-h-screen bg-zinc-950 text-white flex items-center justify-center"><p className="text-zinc-500">Carregando...</p></main>
+
+  return (
+    <main className="min-h-screen bg-zinc-950 text-white px-4 py-8">
+      <div className="max-w-lg mx-auto">
+        <div className="flex items-center gap-4 mb-8">
+          <Link href="/admin/dashboard" className="text-zinc-500 hover:text-white text-sm transition-colors">← voltar</Link>
+          <h1 className="text-xl font-bold">Cadastrar confrontos</h1>
+        </div>
+
+        {sucesso && <div className="bg-emerald-500/10 border border-emerald-500/20 rounded-xl p-4 mb-6 text-emerald-400 text-sm">{sucesso}</div>}
+        {erro && <p className="text-red-400 text-sm mb-4">{erro}</p>}
+
+        {etapa === 'config' && (
+          <div className="flex flex-col gap-4">
+            <div>
+              <label className="text-sm text-zinc-400 block mb-1">Batalha</label>
+              <select className="w-full bg-zinc-900 border border-zinc-800 rounded-lg px-4 py-3 text-white" value={form.batalha_id} onChange={e => setForm(f => ({...f, batalha_id: e.target.value}))}>
+                <option value="">Selecione a batalha</option>
+                {batalhas.map(b => <option key={b.id} value={b.id}>{b.nome} — {b.cidade}</option>)}
+              </select>
+            </div>
+            <div>
+              <label className="text-sm text-zinc-400 block mb-1">Data da noite</label>
+              <input type="date" className="w-full bg-zinc-900 border border-zinc-800 rounded-lg px-4 py-3 text-white" value={form.data} onChange={e => setForm(f => ({...f, data: e.target.value}))} />
+            </div>
+            <div>
+              <label className="text-sm text-zinc-400 block mb-1">Formato</label>
+              <div className="flex gap-2">
+                {['1x1','2x2','3x3','4x4'].map(f => (
+                  <button key={f} onClick={() => setForm(prev => ({...prev, formato: f}))} className={`flex-1 py-2 rounded-lg border text-sm font-medium transition-colors ${form.formato === f ? 'border-emerald-500 bg-emerald-500/10 text-emerald-400' : 'border-zinc-800 text-zinc-400'}`}>{f}</button>
+                ))}
+              </div>
+            </div>
+            <div>
+              <label className="text-sm text-zinc-400 block mb-1">Vagas</label>
+              <div className="flex gap-2">
+                {[4,8,16].map(v => (
+                  <button key={v} onClick={() => setForm(prev => ({...prev, vagas: v}))} className={`flex-1 py-2 rounded-lg border text-sm font-medium transition-colors ${form.vagas === v ? 'border-emerald-500 bg-emerald-500/10 text-emerald-400' : 'border-zinc-800 text-zinc-400'}`}>{v}</button>
+                ))}
+              </div>
+            </div>
+            <div>
+              <label className="text-sm text-zinc-400 block mb-1">Rounds</label>
+              <div className="flex gap-2">
+                {[3,5].map(r => (
+                  <button key={r} onClick={() => setForm(prev => ({...prev, rounds: r}))} className={`flex-1 py-2 rounded-lg border text-sm font-medium transition-colors ${form.rounds === r ? 'border-emerald-500 bg-emerald-500/10 text-emerald-400' : 'border-zinc-800 text-zinc-400'}`}>{r} rounds</button>
+                ))}
+              </div>
+            </div>
+            <button onClick={criarNoite} className="w-full bg-emerald-500 hover:bg-emerald-400 text-black font-semibold py-3 rounded-lg transition-colors mt-2">
+              Começar a cadastrar →
+            </button>
+          </div>
+        )}
+
+        {etapa === 'confrontos' && (
+          <div className="flex flex-col gap-4">
+            <div className="bg-zinc-900 rounded-xl p-3 flex items-center justify-between">
+              <span className="text-sm font-medium text-emerald-400">{faseLabel[faseAtual]}</span>
+              <span className="text-zinc-500 text-xs">{confrontos.filter(c => c.fase === faseAtual).length}/{getMatchesPorFase(faseAtual)} confrontos</span>
+            </div>
+
+            <div>
+              <label className="text-sm text-zinc-400 block mb-1">MC A</label>
+              <input className="w-full bg-zinc-900 border border-zinc-800 rounded-lg px-4 py-3 text-white placeholder-zinc-600" placeholder="Buscar MC..." value={searchA} onChange={e => { setSearchA(e.target.value); setMcA(null) }} />
+              {searchA && !mcA && (
+                <div className="bg-zinc-900 border border-zinc-800 rounded-lg mt-1 max-h-32 overflow-y-auto">
+                  {mcsFiltradosA.slice(0,5).map(m => (
+                    <div key={m.id} onClick={() => { setMcA(m); setSearchA(m.nome_artistico) }} className="px-4 py-2 hover:bg-zinc-800 cursor-pointer text-sm">{m.nome_artistico} <span className="text-zinc-500">{m.cidade}</span></div>
+                  ))}
+                </div>
+              )}
+            </div>
+
+            <div>
+              <label className="text-sm text-zinc-400 block mb-1">MC B</label>
+              <input className="w-full bg-zinc-900 border border-zinc-800 rounded-lg px-4 py-3 text-white placeholder-zinc-600" placeholder="Buscar MC..." value={searchB} onChange={e => { setSearchB(e.target.value); setMcB(null) }} />
+              {searchB && !mcB && (
+                <div className="bg-zinc-900 border border-zinc-800 rounded-lg mt-1 max-h-32 overflow-y-auto">
+                  {mcsFiltradosB.slice(0,5).map(m => (
+                    <div key={m.id} onClick={() => { setMcB(m); setSearchB(m.nome_artistico) }} className="px-4 py-2 hover:bg-zinc-800 cursor-pointer text-sm">{m.nome_artistico} <span className="text-zinc-500">{m.cidade}</span></div>
+                  ))}
+                </div>
+              )}
+            </div>
+
+            {mcA && mcB && (
+              <>
+                <div>
+                  <label className="text-sm text-zinc-400 block mb-1">Placar</label>
+                  <div className="flex gap-2">
+                    {getPlacaresValidos().map(p => (
+                      <button key={p} onClick={() => setPlacar(p)} className={`flex-1 py-2 rounded-lg border text-sm font-medium transition-colors ${placar === p ? 'border-emerald-500 bg-emerald-500/10 text-emerald-400' : 'border-zinc-800 text-zinc-400'}`}>{p}{isLavada(p) ? ' 🔥' : ''}</button>
+                    ))}
+                  </div>
+                </div>
+                {placar && (
+                  <div>
+                    <label className="text-sm text-zinc-400 block mb-1">Vencedor</label>
+                    <div className="flex gap-2">
+                      <button onClick={() => setVencedor('a')} className={`flex-1 py-2 rounded-lg border text-sm font-medium transition-colors ${vencedor === 'a' ? 'border-emerald-500 bg-emerald-500/10 text-emerald-400' : 'border-zinc-800 text-zinc-400'}`}>{mcA.nome_artistico}</button>
+                      <button onClick={() => setVencedor('b')} className={`flex-1 py-2 rounded-lg border text-sm font-medium transition-colors ${vencedor === 'b' ? 'border-emerald-500 bg-emerald-500/10 text-emerald-400' : 'border-zinc-800 text-zinc-400'}`}>{mcB.nome_artistico}</button>
+                    </div>
+                  </div>
+                )}
+              </>
+            )}
+
+            {vencedor && (
+              <button onClick={salvarConfronto} disabled={salvando} className="w-full bg-emerald-500 hover:bg-emerald-400 disabled:bg-zinc-800 text-black font-semibold py-3 rounded-lg transition-colors">
+                {salvando ? 'Salvando...' : 'Confirmar confronto →'}
+              </button>
+            )}
+
+            {confrontos.length > 0 && (
+              <div className="mt-2">
+                <p className="text-zinc-500 text-xs uppercase tracking-wider mb-2">Registrados</p>
+                {confrontos.map((c, i) => (
+                  <div key={i} className="flex items-center justify-between py-2 border-b border-zinc-800 text-sm">
+                    <span className="text-zinc-400">{faseLabel[c.fase]}</span>
+                    <span><span className="text-emerald-400 font-medium">{c.vencedor.nome_artistico}</span> def. {c.fase === 'a' ? c.mcB.nome_artistico : (c.vencedor.id === c.mcA.id ? c.mcB.nome_artistico : c.mcA.nome_artistico)}</span>
+                    <span className="text-zinc-500">{c.placar}</span>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        )}
+      </div>
+    </main>
+  )
+}
