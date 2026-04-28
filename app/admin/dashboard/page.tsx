@@ -25,9 +25,9 @@ export default function AdminDashboard() {
       if (profile?.tipo !== 'admin') { router.push('/'); return }
 
       const [mcs, batalhas, confrontos, pendentes] = await Promise.all([
-        supabase.from('mcs').select('id', { count: 'exact' }),
-        supabase.from('batalhas').select('id', { count: 'exact' }),
-        supabase.from('confrontos').select('id', { count: 'exact' }),
+        supabase.from('mcs').select('*', { count: 'exact', head: true }),
+        supabase.from('batalhas').select('*', { count: 'exact', head: true }).eq('status', 'aprovada'),
+        supabase.from('confrontos').select('*', { count: 'exact', head: true }),
         supabase.from('batalhas').select('*').eq('status', 'pendente'),
       ])
 
@@ -86,7 +86,7 @@ export default function AdminDashboard() {
             <p className="text-3xl font-bold text-emerald-400">{stats.mcs}</p>
           </div>
           <div className="bg-zinc-900 rounded-xl p-4">
-            <p className="text-zinc-500 text-xs mb-1">Batalhas</p>
+            <p className="text-zinc-500 text-xs mb-1">Batalhas aprovadas</p>
             <p className="text-3xl font-bold">{stats.batalhas}</p>
           </div>
           <div className="bg-zinc-900 rounded-xl p-4">
@@ -122,16 +122,10 @@ export default function AdminDashboard() {
                     </div>
                   </div>
                   <div className="flex gap-2">
-                    <button
-                      onClick={() => aprovarBatalha(b.id)}
-                      className="flex-1 bg-emerald-500 hover:bg-emerald-400 text-black font-semibold py-2 rounded-lg text-sm transition-colors"
-                    >
+                    <button onClick={() => aprovarBatalha(b.id)} className="flex-1 bg-emerald-500 hover:bg-emerald-400 text-black font-semibold py-2 rounded-lg text-sm transition-colors">
                       Aprovar
                     </button>
-                    <button
-                      onClick={() => recusarBatalha(b.id)}
-                      className="flex-1 border border-zinc-700 text-zinc-400 hover:text-white font-semibold py-2 rounded-lg text-sm transition-colors"
-                    >
+                    <button onClick={() => recusarBatalha(b.id)} className="flex-1 border border-zinc-700 text-zinc-400 hover:text-white font-semibold py-2 rounded-lg text-sm transition-colors">
                       Recusar
                     </button>
                   </div>
