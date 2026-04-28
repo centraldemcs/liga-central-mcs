@@ -57,27 +57,61 @@ export default function CadastroBatalha() {
       return
     }
 
-    const { error: batalhaError } = await supabase
+    // Verifica se já existe batalha com esse nome no banco sem profile_id
+    const { data: batalhaExistente } = await supabase
       .from('batalhas')
-      .insert({
-        profile_id: data.user.id,
-        nome: form.nome,
-        cidade: form.cidade,
-        estado: form.estado,
-        distribuidora: form.distribuidora,
-        spotify_url: form.sem_spotify ? null : form.spotify_url,
-        responsavel_nome: form.resp_nome,
-        responsavel_email: form.resp_email,
-        responsavel_telefone: form.resp_telefone,
-        responsavel_cpf: form.resp_cpf,
-        responsavel_nascimento: form.resp_nascimento,
-        status: 'pendente',
-      })
+      .select('id, nome')
+      .ilike('nome', form.nome.trim())
+      .is('profile_id', null)
+      .single()
 
-    if (batalhaError) {
-      setErro('Erro ao salvar dados da batalha.')
-      setLoading(false)
-      return
+    if (batalhaExistente) {
+      // Vincula o perfil à batalha existente e atualiza os dados
+      const { error: updateError } = await supabase
+        .from('batalhas')
+        .update({
+          profile_id: data.user.id,
+          cidade: form.cidade,
+          estado: form.estado,
+          distribuidora: form.distribuidora,
+          spotify_url: form.sem_spotify ? null : form.spotify_url,
+          responsavel_nome: form.resp_nome,
+          responsavel_email: form.resp_email,
+          responsavel_telefone: form.resp_telefone,
+          responsavel_cpf: form.resp_cpf,
+          responsavel_nascimento: form.resp_nascimento,
+        })
+        .eq('id', batalhaExistente.id)
+
+      if (updateError) {
+        setErro('Erro ao vincular batalha existente.')
+        setLoading(false)
+        return
+      }
+    } else {
+      // Cria nova batalha
+      const { error: batalhaError } = await supabase
+        .from('batalhas')
+        .insert({
+          profile_id: data.user.id,
+          nome: form.nome,
+          cidade: form.cidade,
+          estado: form.estado,
+          distribuidora: form.distribuidora,
+          spotify_url: form.sem_spotify ? null : form.spotify_url,
+          responsavel_nome: form.resp_nome,
+          responsavel_email: form.resp_email,
+          responsavel_telefone: form.resp_telefone,
+          responsavel_cpf: form.resp_cpf,
+          responsavel_nascimento: form.resp_nascimento,
+          status: 'pendente',
+        })
+
+      if (batalhaError) {
+        setErro('Erro ao salvar dados da batalha.')
+        setLoading(false)
+        return
+      }
     }
 
     router.push('/batalha/dashboard')
@@ -105,7 +139,8 @@ export default function CadastroBatalha() {
           <div className="flex flex-col gap-4">
             <div>
               <label className="text-sm text-zinc-400 block mb-1">Nome da batalha</label>
-              <input className={inputClass} value={form.nome} onChange={e => set('nome', e.target.value)} placeholder="Ex: Liga do Povo" />
+              <input className={inputClass} value={form.nome} onChange={e => set('nome', e.target.value)} placeholder="Ex: Batalha do Carrão" />
+              <p className="text-zinc-600 text-xs mt-1">Digite exatamente como aparece no ranking da Liga</p>
             </div>
             <div className="grid grid-cols-2 gap-3">
               <div>
