@@ -4,7 +4,7 @@ import { createClient } from '@/lib/supabase'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 
-export default function Adminconfrontos() {
+export default function AdminConfrontos() {
   const [batalhas, setBatalhas] = useState<any[]>([])
   const [mcs, setMcs] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
@@ -89,13 +89,14 @@ export default function Adminconfrontos() {
   async function criarNoite() {
     if (!form.batalha_id || !form.data) { setErro('Preencha todos os campos.'); return }
     setErro('')
-    const { data } = await supabase.from('noites').insert({
+    const { data, error } = await supabase.from('noites').insert({
       batalha_id: form.batalha_id,
       data: form.data,
       formato: form.formato,
       vagas: form.vagas,
       rounds: form.rounds,
     }).select().single()
+    if (error) { setErro('Erro ao criar noite: ' + error.message); return }
     if (data) {
       setNoiteId(data.id)
       setFaseAtual(getFases()[0])
@@ -103,12 +104,29 @@ export default function Adminconfrontos() {
     }
   }
 
+  async function criarMcNoBanco(nome: string) {
+    const palette = [['#E1F5EE','#085041'],['#E6F1FB','#0C447C'],['#FAEEDA','#633806'],['#FBEAF0','#72243E'],['#FAECE7','#4A1B0C'],['#EAF3DE','#173404']]
+    const c = palette[Math.floor(Math.random() * palette.length)]
+    const { data, error } = await supabase.from('mcs').insert({
+      nome_completo: nome,
+      nome_artistico: nome,
+      data_nascimento: '1990-01-01',
+      cidade: 'São Paulo',
+      estado: 'SP',
+      whatsapp: '',
+      email: `${nome.toLowerCase().replace(/\s/g, '')}@ligacentral.com`,
+      aceite_termos: false,
+    }).select().single()
+    if (error) { setErro('Erro ao criar MC: ' + error.message); return null }
+    setMcs(prev => [...prev, data])
+    return data
+  }
+
   async function salvarConfronto() {
     if (!mcA || !mcB || !placar || !vencedor) { setErro('Preencha todos os campos do confronto.'); return }
     setSalvando(true)
     setErro('')
     const vencedorMc = vencedor === 'a' ? mcA : mcB
-    const perdedorMc = vencedor === 'a' ? mcB : mcA
     const lavada = isLavada(placar)
     const pontos = getPontos(faseAtual) + (lavada ? 1 : 0)
 
@@ -206,7 +224,10 @@ export default function Adminconfrontos() {
                 ))}
               </div>
             </div>
-            <button onClick={criarNoite} className="w-full bg-emerald-500 hover:bg-emerald-400 text-black font-semibold py-3 rounded-lg transition-colors mt-2">
+            <button
+              onClick={criarNoite}
+              disabled={!form.batalha_id || !form.data}
+              className="w-full bg-emerald-500 hover:bg-emerald-400 disabled:bg-zinc-800 disabled:text-zinc-600 text-black font-semibold py-3 rounded-lg transition-colors mt-2">
               Começar a cadastrar →
             </button>
           </div>
@@ -219,28 +240,68 @@ export default function Adminconfrontos() {
               <span className="text-zinc-500 text-xs">{confrontos.filter(c => c.fase === faseAtual).length}/{getMatchesPorFase(faseAtual)} confrontos</span>
             </div>
 
+            {/* MC A */}
             <div>
               <label className="text-sm text-zinc-400 block mb-1">MC A</label>
-              <input className="w-full bg-zinc-900 border border-zinc-800 rounded-lg px-4 py-3 text-white placeholder-zinc-600" placeholder="Buscar MC..." value={searchA} onChange={e => { setSearchA(e.target.value); setMcA(null) }} />
+              <input
+                className="w-full bg-zinc-900 border border-zinc-800 rounded-lg px-4 py-3 text-white placeholder-zinc-600"
+                placeholder="Buscar MC..."
+                value={searchA}
+                onChange={e => { setSearchA(e.target.value); setMcA(null) }}
+              />
               {searchA && !mcA && (
-                <div className="bg-zinc-900 border border-zinc-800 rounded-lg mt-1 max-h-32 overflow-y-auto">
+                <div className="bg-zinc-900 border border-zinc-800 rounded-lg mt-1 max-h-40 overflow-y-auto">
                   {mcsFiltradosA.slice(0,5).map(m => (
-                    <div key={m.id} onClick={() => { setMcA(m); setSearchA(m.nome_artistico) }} className="px-4 py-2 hover:bg-zinc-800 cursor-pointer text-sm">{m.nome_artistico} <span className="text-zinc-500">{m.cidade}</span></div>
+                    <div key={m.id} onClick={() => { setMcA(m); setSearchA(m.nome_artistico) }} className="px-4 py-2 hover:bg-zinc-800 cursor-pointer text-sm">
+                      {m.nome_artistico} <span className="text-zinc-500">{m.cidade}</span>
+                    </div>
                   ))}
+                  {mcsFiltradosA.length === 0 && searchA.length >= 2 && (
+                    <div
+                      onClick={async () => {
+                        const novo = await criarMcNoBanco(searchA)
+                        if (novo) { setMcA(novo); setSearchA(novo.nome_artistico) }
+                      }}
+                      className="px-4 py-2 hover:bg-zinc-800 cursor-pointer text-sm text-emerald-400"
+                    >
+                      + Criar MC: <strong>{searchA}</strong>
+                    </div>
+                  )}
                 </div>
               )}
+              {mcA && <p className="text-emerald-400 text-xs mt-1">✓ {mcA.nome_artistico}</p>}
             </div>
 
+            {/* MC B */}
             <div>
               <label className="text-sm text-zinc-400 block mb-1">MC B</label>
-              <input className="w-full bg-zinc-900 border border-zinc-800 rounded-lg px-4 py-3 text-white placeholder-zinc-600" placeholder="Buscar MC..." value={searchB} onChange={e => { setSearchB(e.target.value); setMcB(null) }} />
+              <input
+                className="w-full bg-zinc-900 border border-zinc-800 rounded-lg px-4 py-3 text-white placeholder-zinc-600"
+                placeholder="Buscar MC..."
+                value={searchB}
+                onChange={e => { setSearchB(e.target.value); setMcB(null) }}
+              />
               {searchB && !mcB && (
-                <div className="bg-zinc-900 border border-zinc-800 rounded-lg mt-1 max-h-32 overflow-y-auto">
+                <div className="bg-zinc-900 border border-zinc-800 rounded-lg mt-1 max-h-40 overflow-y-auto">
                   {mcsFiltradosB.slice(0,5).map(m => (
-                    <div key={m.id} onClick={() => { setMcB(m); setSearchB(m.nome_artistico) }} className="px-4 py-2 hover:bg-zinc-800 cursor-pointer text-sm">{m.nome_artistico} <span className="text-zinc-500">{m.cidade}</span></div>
+                    <div key={m.id} onClick={() => { setMcB(m); setSearchB(m.nome_artistico) }} className="px-4 py-2 hover:bg-zinc-800 cursor-pointer text-sm">
+                      {m.nome_artistico} <span className="text-zinc-500">{m.cidade}</span>
+                    </div>
                   ))}
+                  {mcsFiltradosB.length === 0 && searchB.length >= 2 && (
+                    <div
+                      onClick={async () => {
+                        const novo = await criarMcNoBanco(searchB)
+                        if (novo) { setMcB(novo); setSearchB(novo.nome_artistico) }
+                      }}
+                      className="px-4 py-2 hover:bg-zinc-800 cursor-pointer text-sm text-emerald-400"
+                    >
+                      + Criar MC: <strong>{searchB}</strong>
+                    </div>
+                  )}
                 </div>
               )}
+              {mcB && <p className="text-emerald-400 text-xs mt-1">✓ {mcB.nome_artistico}</p>}
             </div>
 
             {mcA && mcB && (
@@ -249,7 +310,9 @@ export default function Adminconfrontos() {
                   <label className="text-sm text-zinc-400 block mb-1">Placar</label>
                   <div className="flex gap-2">
                     {getPlacaresValidos().map(p => (
-                      <button key={p} onClick={() => setPlacar(p)} className={`flex-1 py-2 rounded-lg border text-sm font-medium transition-colors ${placar === p ? 'border-emerald-500 bg-emerald-500/10 text-emerald-400' : 'border-zinc-800 text-zinc-400'}`}>{p}{isLavada(p) ? ' 🔥' : ''}</button>
+                      <button key={p} onClick={() => setPlacar(p)} className={`flex-1 py-2 rounded-lg border text-sm font-medium transition-colors ${placar === p ? 'border-emerald-500 bg-emerald-500/10 text-emerald-400' : 'border-zinc-800 text-zinc-400'}`}>
+                        {p}{isLavada(p) ? ' 🔥' : ''}
+                      </button>
                     ))}
                   </div>
                 </div>
@@ -276,8 +339,8 @@ export default function Adminconfrontos() {
                 <p className="text-zinc-500 text-xs uppercase tracking-wider mb-2">Registrados</p>
                 {confrontos.map((c, i) => (
                   <div key={i} className="flex items-center justify-between py-2 border-b border-zinc-800 text-sm">
-                    <span className="text-zinc-400">{faseLabel[c.fase]}</span>
-                    <span><span className="text-emerald-400 font-medium">{c.vencedor.nome_artistico}</span> def. {c.fase === 'a' ? c.mcB.nome_artistico : (c.vencedor.id === c.mcA.id ? c.mcB.nome_artistico : c.mcA.nome_artistico)}</span>
+                    <span className="text-zinc-400 text-xs">{faseLabel[c.fase]}</span>
+                    <span><span className="text-emerald-400 font-medium">{c.vencedor.nome_artistico}</span> def. {c.vencedor.id === c.mcA.id ? c.mcB.nome_artistico : c.mcA.nome_artistico}</span>
                     <span className="text-zinc-500">{c.placar}</span>
                   </div>
                 ))}
