@@ -23,6 +23,7 @@ interface NavbarProps {
 export default function Navbar({ batalhas = [], mcs = [] }: NavbarProps) {
   const [batalhasOpen, setBatalhasOpen] = useState(false)
   const [mcsOpen, setMcsOpen] = useState(false)
+  const [entrarOpen, setEntrarOpen] = useState(false)
 
   return (
     <nav style={{
@@ -131,15 +132,46 @@ export default function Navbar({ batalhas = [], mcs = [] }: NavbarProps) {
 
       {/* CTAs */}
       <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-        <Link href="/mc/login" style={{
-          fontFamily: "'Barlow Condensed', sans-serif", fontWeight: 700, fontSize: '13px',
-          textTransform: 'uppercase', color: 'rgba(255,255,255,0.6)', textDecoration: 'none',
-          padding: '10px 16px', letterSpacing: '0.5px',
-          border: '1px solid rgba(255,255,255,0.15)',
-          clipPath: 'polygon(8px 0, 100% 0, calc(100% - 8px) 100%, 0 100%)',
-        }}>
-          Entrar
-        </Link>
+
+        {/* ENTRAR com dropdown */}
+        <div style={{ position: 'relative' }}
+          onMouseEnter={() => setEntrarOpen(true)}
+          onMouseLeave={() => setEntrarOpen(false)}
+        >
+          <button style={{
+            fontFamily: "'Barlow Condensed', sans-serif", fontWeight: 700, fontSize: '13px',
+            textTransform: 'uppercase', color: 'rgba(255,255,255,0.6)', textDecoration: 'none',
+            padding: '10px 16px', letterSpacing: '0.5px', background: 'none', cursor: 'pointer',
+            border: '1px solid rgba(255,255,255,0.15)', display: 'flex', alignItems: 'center', gap: '6px',
+            clipPath: 'polygon(8px 0, 100% 0, calc(100% - 8px) 100%, 0 100%)',
+          }}>
+            Entrar <span style={{ fontSize: '10px', opacity: 0.5 }}>▼</span>
+          </button>
+          {entrarOpen && (
+            <div style={{
+              position: 'absolute', top: 'calc(100% + 4px)', right: 0, minWidth: '200px',
+              background: '#1a1a1a', border: '1px solid rgba(245,168,0,0.25)', zIndex: 100,
+              clipPath: 'polygon(0 0, calc(100% - 10px) 0, 100% 10px, 100% 100%, 0 100%)',
+            }}>
+              <Link href="/mc/login" style={{
+                display: 'block', padding: '12px 16px',
+                fontFamily: "'Barlow Condensed', sans-serif", fontWeight: 700, fontSize: '13px',
+                textTransform: 'uppercase', color: 'rgba(255,255,255,0.6)', textDecoration: 'none',
+                borderBottom: '1px solid rgba(255,255,255,0.05)',
+              }}>
+                🎤 Sou MC
+              </Link>
+              <Link href="/batalha/login" style={{
+                display: 'block', padding: '12px 16px',
+                fontFamily: "'Barlow Condensed', sans-serif", fontWeight: 700, fontSize: '13px',
+                textTransform: 'uppercase', color: 'rgba(255,255,255,0.6)', textDecoration: 'none',
+              }}>
+                🏆 Sou Organizador
+              </Link>
+            </div>
+          )}
+        </div>
+
         <Link href="/mc/cadastro" style={{
           background: '#F5A800', color: '#111',
           fontFamily: "'Barlow Condensed', sans-serif", fontWeight: 900, fontStyle: 'italic',
