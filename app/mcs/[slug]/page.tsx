@@ -9,9 +9,9 @@ const faseLabel: any = {
   final: 'Final',
 }
 
-export default async function McPerfilPage({ params }: { params: { slug: string } }) {
+export default async function McPerfilPage({ params }: { params: Promise<{ slug: string }> }) {
   const supabase = createServerClient()
-  const { slug } = params
+  const { slug } = await params
 
   const { data: mcs } = await supabase.from('mcs').select('*')
 
