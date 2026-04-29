@@ -13,13 +13,37 @@ export const revalidate = 300
 export default async function HomePage() {
   const supabase = createServerClient()
 
-  // Busca semana atual do banco
   const { data: config } = await supabase
     .from('liga_config')
     .select('semana_atual')
     .single()
 
   const SEMANA_ATUAL = config?.semana_atual ?? 2
+
+  // Batalhas para o dropdown
+  const { data: batalhasMenu } = await supabase
+    .from('batalhas')
+    .select('id, nome, slug')
+    .eq('status', 'aprovada')
+    .order('nome', { ascending: true })
+
+  // Top 5 MCs do ranking geral para o dropdown
+  const { data: mcsMenu } = await supabase
+    .from('ranking_geral')
+    .select('id, nome_artistico')
+    .limit(5)
+
+  const batalhasNav = (batalhasMenu ?? []).map(b => ({
+    id: b.id,
+    titulo: b.nome,
+    slug: b.slug,
+  }))
+
+  const mcsNav = (mcsMenu ?? []).map(mc => ({
+    id: mc.id,
+    nome: mc.nome_artistico,
+    slug: mc.nome_artistico.toLowerCase().replace(/\s+/g, '-').replace(/\./g, ''),
+  }))
 
   const { data: rankingRaw } = await supabase
     .from('ranking_semanal_view')
@@ -78,7 +102,7 @@ export default async function HomePage() {
 
       return (
         <main style={{ background: '#111111', minHeight: '100vh' }}>
-          <Navbar />
+          <Navbar batalhas={batalhasNav} mcs={mcsNav} />
           <Hero semanaAtual={SEMANA_ATUAL} />
           <StatsBar
             totalMcs={totalMcs ?? 0}
@@ -95,7 +119,7 @@ export default async function HomePage() {
 
   return (
     <main style={{ background: '#111111', minHeight: '100vh' }}>
-      <Navbar />
+      <Navbar batalhas={batalhasNav} mcs={mcsNav} />
       <Hero semanaAtual={SEMANA_ATUAL} />
       <StatsBar
         totalMcs={totalMcs ?? 0}
