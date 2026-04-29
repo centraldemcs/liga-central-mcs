@@ -80,12 +80,7 @@ export default function Navbar({ batalhas = [], mcs = [] }: NavbarProps) {
               clipPath: 'polygon(0 0, calc(100% - 10px) 0, 100% 10px, 100% 100%, 0 100%)',
             }}>
               {batalhas.length > 0 ? batalhas.map((b) => (
-                <Link key={b.id} href={`/batalhas/${b.slug}`} style={{
-                  display: 'block', padding: '10px 16px',
-                  fontFamily: "'Barlow Condensed', sans-serif", fontWeight: 700, fontSize: '13px',
-                  textTransform: 'uppercase', color: 'rgba(255,255,255,0.6)', textDecoration: 'none',
-                  borderBottom: '1px solid rgba(255,255,255,0.05)',
-                }}>{b.titulo}</Link>
+                <Link key={b.id} href={`/batalhas/${b.slug}`} style={{ display: 'block', padding: '10px 16px', fontFamily: "'Barlow Condensed', sans-serif", fontWeight: 700, fontSize: '13px', textTransform: 'uppercase', color: 'rgba(255,255,255,0.6)', textDecoration: 'none', borderBottom: '1px solid rgba(255,255,255,0.05)' }}>{b.titulo}</Link>
               )) : (
                 <>
                   <Link href="/batalhas/semana-2" style={{ display: 'block', padding: '10px 16px', fontFamily: "'Barlow Condensed', sans-serif", fontWeight: 700, fontSize: '13px', textTransform: 'uppercase', color: 'rgba(255,255,255,0.6)', textDecoration: 'none', borderBottom: '1px solid rgba(255,255,255,0.05)' }}>Batalha Semana #2</Link>
@@ -134,15 +129,26 @@ export default function Navbar({ batalhas = [], mcs = [] }: NavbarProps) {
         </li>
       </ul>
 
-      {/* CTA */}
-      <Link href="/inscricao" style={{
-        background: '#F5A800', color: '#111',
-        fontFamily: "'Barlow Condensed', sans-serif", fontWeight: 900, fontStyle: 'italic',
-        fontSize: '13px', textTransform: 'uppercase', padding: '10px 22px', textDecoration: 'none',
-        clipPath: 'polygon(8px 0, 100% 0, calc(100% - 8px) 100%, 0 100%)',
-      }}>
-        Inscreva-se
-      </Link>
+      {/* CTAs */}
+      <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+        <Link href="/mc/login" style={{
+          fontFamily: "'Barlow Condensed', sans-serif", fontWeight: 700, fontSize: '13px',
+          textTransform: 'uppercase', color: 'rgba(255,255,255,0.6)', textDecoration: 'none',
+          padding: '10px 16px', letterSpacing: '0.5px',
+          border: '1px solid rgba(255,255,255,0.15)',
+          clipPath: 'polygon(8px 0, 100% 0, calc(100% - 8px) 100%, 0 100%)',
+        }}>
+          Entrar
+        </Link>
+        <Link href="/mc/cadastro" style={{
+          background: '#F5A800', color: '#111',
+          fontFamily: "'Barlow Condensed', sans-serif", fontWeight: 900, fontStyle: 'italic',
+          fontSize: '13px', textTransform: 'uppercase', padding: '10px 22px', textDecoration: 'none',
+          clipPath: 'polygon(8px 0, 100% 0, calc(100% - 8px) 100%, 0 100%)',
+        }}>
+          Inscreva-se
+        </Link>
+      </div>
     </nav>
   )
 }
