@@ -74,7 +74,7 @@ export default function Navbar({ batalhas = [], mcs = [] }: NavbarProps) {
         </li>
 
         <li>
-          <Link href="/sobre" style={{ fontFamily: "'Barlow Condensed', sans-serif", fontWeight: 700, fontSize: '14px', textTransform: 'uppercase', color: 'rgba(255,255,255,0.6)', textDecoration: 'none', padding: '8px 14px', display: 'block', letterSpacing: '0.5px' }}>Sobre</Link>
+          <Link href="/a-liga" style={{ fontFamily: "'Barlow Condensed', sans-serif", fontWeight: 700, fontSize: '14px', textTransform: 'uppercase', color: 'rgba(255,255,255,0.6)', textDecoration: 'none', padding: '8px 14px', display: 'block', letterSpacing: '0.5px' }}>A Liga</Link>
         </li>
       </ul>
 

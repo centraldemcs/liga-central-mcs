@@ -16,12 +16,12 @@ export default function StatsBar({ totalMcs, totalBatalhas, winRateLider }: Stat
       <div style={{ width: '1px', height: '36px', background: 'rgba(0,0,0,0.18)' }} />
       <StatItem value="R$250" label="Premiação Semanal" />
       <div style={{ width: '1px', height: '36px', background: 'rgba(0,0,0,0.18)' }} />
-      <StatItem value={`${winRateLider.toFixed(1)}%`} label="Win-Rate do Líder" note="*a partir da semana #2" />
+      <StatItem value={`${winRateLider.toFixed(1)}%`} label="Win-Rate do Líder" />
     </div>
   )
 }
 
-function StatItem({ value, label, note }: { value: string; label: string; note?: string }) {
+function StatItem({ value, label }: { value: string; label: string }) {
   return (
     <div style={{ textAlign: 'center' }}>
       <div style={{
@@ -36,14 +36,6 @@ function StatItem({ value, label, note }: { value: string; label: string; note?:
       }}>
         {label}
       </div>
-      {note && (
-        <div style={{
-          fontFamily: "'Barlow Condensed', sans-serif", fontWeight: 700, fontSize: '10px',
-          color: 'rgba(0,0,0,0.4)', marginTop: '2px', fontStyle: 'italic',
-        }}>
-          {note}
-        </div>
-      )}
     </div>
   )
 }

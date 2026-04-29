@@ -8,16 +8,25 @@ import Footer from './components/home/Footer'
 import type { RankingEntry } from './components/home/RankingSemanal'
 import type { McDestaque } from './components/home/McDestaqueCard'
 
-const SEMANA_ATUAL = 2
-
 export const revalidate = 300
 
 export default async function HomePage() {
   const supabase = createServerClient()
 
+  // Busca semana atual do banco
+  const { data: config } = await supabase
+    .from('liga_config')
+    .select('semana_atual')
+    .single()
+
+  const SEMANA_ATUAL = config?.semana_atual ?? 2
+
   const { data: rankingRaw } = await supabase
-    .from('ranking_geral')
+    .from('ranking_semanal_view')
     .select('id, nome_artistico, total_pontos, total_lavadas')
+    .eq('semana', SEMANA_ATUAL)
+    .order('total_pontos', { ascending: false })
+    .order('total_lavadas', { ascending: false })
     .limit(5)
 
   const ranking: RankingEntry[] = (rankingRaw ?? []).map((mc, index) => ({
@@ -32,12 +41,10 @@ export default async function HomePage() {
     .from('mcs')
     .select('*', { count: 'exact', head: true })
 
-  const { data: batalhasData } = await supabase
+  const { count: totalBatalhas } = await supabase
     .from('batalhas')
-    .select('id')
-    .like('id', 'b1000000%')
-
-  const totalBatalhas = batalhasData?.length ?? 5
+    .select('*', { count: 'exact', head: true })
+    .eq('status', 'aprovada')
 
   let winRateLider = 0
   const lider = ranking[0]
@@ -75,7 +82,7 @@ export default async function HomePage() {
           <Hero semanaAtual={SEMANA_ATUAL} />
           <StatsBar
             totalMcs={totalMcs ?? 0}
-            totalBatalhas={totalBatalhas}
+            totalBatalhas={totalBatalhas ?? 0}
             winRateLider={winRateLider}
           />
           <RankingSemanal semana={SEMANA_ATUAL} ranking={ranking} />
@@ -92,7 +99,7 @@ export default async function HomePage() {
       <Hero semanaAtual={SEMANA_ATUAL} />
       <StatsBar
         totalMcs={totalMcs ?? 0}
-        totalBatalhas={totalBatalhas}
+        totalBatalhas={totalBatalhas ?? 0}
         winRateLider={winRateLider}
       />
       <RankingSemanal semana={SEMANA_ATUAL} ranking={ranking} />
