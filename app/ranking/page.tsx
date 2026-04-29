@@ -1,19 +1,19 @@
 'use client'
-import { useEffect, useState } from 'react'
-import { createClient } from '@/lib/supabase'
-import Link from 'next/link'
 
-export default function Ranking() {
+import { useEffect, useState } from 'react'
+import Link from 'next/link'
+import { createClient } from '@/lib/supabase'
+
+export default function RankingPage() {
   const [ranking, setRanking] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
-  const supabase = createClient()
 
   useEffect(() => {
     async function load() {
+      const supabase = createClient()
       const { data } = await supabase
         .from('ranking_geral')
-        .select('*')
-        .limit(100)
+        .select('id, nome_artistico, total_pontos, total_lavadas, total_noites, total_titulos')
       setRanking(data || [])
       setLoading(false)
     }
@@ -21,88 +21,92 @@ export default function Ranking() {
   }, [])
 
   return (
-    <main className="min-h-screen bg-black text-white px-4 py-8">
-      <div className="max-w-2xl mx-auto">
-        <div className="flex items-center justify-between mb-8">
-          <div>
-            <h1 className="text-2xl font-bold">Ranking</h1>
-            <p className="text-zinc-500 text-sm">Liga Central de MCs</p>
-          </div>
-          <Link href="/" className="text-zinc-500 hover:text-white text-sm transition-colors">
-            ← início
-          </Link>
-        </div>
+    <main style={{ background: '#111', minHeight: '100vh', fontFamily: "'Barlow', sans-serif" }}>
 
-        <div className="flex items-center gap-4 mb-4 flex-wrap">
-          <div className="flex items-center gap-2">
-            <div className="w-3 h-3 rounded-full bg-amber-500/60"></div>
-            <span className="text-zinc-500 text-xs">Líder</span>
-          </div>
-          <div className="flex items-center gap-2">
-            <div className="w-3 h-3 rounded-full bg-emerald-500/30"></div>
-            <span className="text-zinc-500 text-xs">Classificados para a Copa Nacional Central de MC's (top 16)</span>
-          </div>
+      {/* HEADER */}
+      <div style={{ borderBottom: '1px solid rgba(245,168,0,0.2)', padding: '24px 40px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '12px' }}>
+        <div>
+          <p style={{ fontFamily: "'Barlow Condensed', sans-serif", fontWeight: 700, fontSize: '12px', letterSpacing: '2px', textTransform: 'uppercase', color: 'rgba(255,255,255,0.35)', marginBottom: '4px' }}>Liga Central de MC's</p>
+          <h1 style={{ fontFamily: "'Barlow Condensed', sans-serif", fontWeight: 900, fontStyle: 'italic', fontSize: '42px', textTransform: 'uppercase', color: '#fff', lineHeight: 1 }}>
+            Ranking <span style={{ color: '#F5A800' }}>Geral</span>
+          </h1>
         </div>
+        <Link href="/" style={{ fontFamily: "'Barlow Condensed', sans-serif", fontWeight: 700, fontSize: '13px', textTransform: 'uppercase', color: '#F5A800', textDecoration: 'none', letterSpacing: '1px', borderBottom: '1px solid rgba(245,168,0,0.4)', paddingBottom: '2px' }}>
+          ← Início
+        </Link>
+      </div>
 
+      {/* LEGENDA */}
+      <div style={{ padding: '16px 40px', display: 'flex', gap: '20px', borderBottom: '1px solid rgba(255,255,255,0.05)', flexWrap: 'wrap' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+          <div style={{ width: '10px', height: '10px', borderRadius: '50%', background: '#F5A800' }} />
+          <span style={{ fontFamily: "'Barlow Condensed', sans-serif", fontWeight: 700, fontSize: '12px', textTransform: 'uppercase', color: 'rgba(255,255,255,0.5)', letterSpacing: '0.5px' }}>Líder</span>
+        </div>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+          <div style={{ width: '10px', height: '10px', borderRadius: '50%', background: 'rgba(100,200,100,0.8)' }} />
+          <span style={{ fontFamily: "'Barlow Condensed', sans-serif", fontWeight: 700, fontSize: '12px', textTransform: 'uppercase', color: 'rgba(255,255,255,0.5)', letterSpacing: '0.5px' }}>Classificados Copa Nacional (top 16)</span>
+        </div>
+      </div>
+
+      {/* TABELA */}
+      <div style={{ padding: '24px 40px' }}>
         {loading ? (
-          <p className="text-zinc-500 text-center py-12">Carregando...</p>
-        ) : ranking.length === 0 ? (
-          <div className="text-center py-12">
-            <p className="text-zinc-500">Nenhum MC no ranking ainda.</p>
-          </div>
+          <p style={{ fontFamily: "'Barlow Condensed', sans-serif", fontWeight: 700, fontSize: '16px', textTransform: 'uppercase', color: 'rgba(255,255,255,0.3)', letterSpacing: '2px', textAlign: 'center', padding: '40px' }}>Carregando...</p>
         ) : (
-          <div className="overflow-x-auto">
-            <table className="w-full text-sm">
-              <thead>
-                <tr className="border-b border-zinc-800">
-                  <th className="text-left py-2 px-2 text-zinc-500 font-medium w-8">#</th>
-                  <th className="text-left py-2 px-2 text-zinc-500 font-medium">MC</th>
-                  <th className="text-center py-2 px-2 text-zinc-500 font-medium w-10" title="Batalhas">B</th>
-                  <th className="text-center py-2 px-2 text-zinc-500 font-medium w-10" title="Títulos">T</th>
-                  <th className="text-center py-2 px-2 text-zinc-500 font-medium w-10" title="Lavadas">L</th>
-                  <th className="text-center py-2 px-2 text-zinc-500 font-medium w-12" title="Pontos">PTS</th>
-                </tr>
-              </thead>
-              <tbody>
-                {ranking.map((mc, i) => {
-                  const isLider = i === 0
-                  const isClassificado = i > 0 && i < 16
-                  const rowClass = isLider
-                    ? 'bg-amber-500/10 border-l-2 border-amber-500'
-                    : isClassificado
-                    ? 'bg-emerald-500/5 border-l-2 border-emerald-500/40'
-                    : 'border-l-2 border-transparent'
-
-                  return (
-                    <tr key={mc.id} className={`border-b border-zinc-900 ${rowClass}`}>
-                      <td className="py-3 px-2">
-                        <span className={`font-bold ${isLider ? 'text-amber-400' : isClassificado ? 'text-emerald-400' : 'text-zinc-600'}`}>
-                          {i + 1}
-                        </span>
-                      </td>
-                      <td className="py-3 px-2">
-                        <span className="font-medium">{mc.nome_artistico}</span>
-                      </td>
-                      <td className="py-3 px-2 text-center text-zinc-400">{mc.total_noites}</td>
-                      <td className="py-3 px-2 text-center text-zinc-400">{mc.total_titulos}</td>
-                      <td className="py-3 px-2 text-center text-zinc-400">{mc.total_lavadas}</td>
-                      <td className="py-3 px-2 text-center">
-                        <span className={`font-bold text-base ${isLider ? 'text-amber-400' : isClassificado ? 'text-emerald-400' : 'text-zinc-300'}`}>
-                          {mc.total_pontos}
-                        </span>
-                      </td>
-                    </tr>
-                  )
-                })}
-              </tbody>
-            </table>
-            <div className="flex items-center gap-6 mt-4 text-xs text-zinc-600">
-              <span>B = Batalhas</span>
-              <span>T = Títulos</span>
-              <span>L = Lavadas</span>
-              <span>PTS = Pontos</span>
+          <>
+            {/* Header da tabela */}
+            <div style={{ display: 'grid', gridTemplateColumns: '60px 1fr 80px 80px 80px 80px', gap: '8px', padding: '8px 18px', marginBottom: '6px' }}>
+              {['#', 'MC', 'B', 'T', 'L', 'PTS'].map((h, i) => (
+                <span key={i} style={{ fontFamily: "'Barlow Condensed', sans-serif", fontWeight: 700, fontSize: '12px', textTransform: 'uppercase', color: 'rgba(255,255,255,0.3)', letterSpacing: '1px', textAlign: i > 1 ? 'center' : 'left' }}>{h}</span>
+              ))}
             </div>
-          </div>
+
+            {/* Linhas */}
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+              {ranking.map((mc, i) => {
+                const isLider = i === 0
+                const isClassificado = i > 0 && i < 16
+                return (
+                  <div key={mc.id} style={{
+                    display: 'grid', gridTemplateColumns: '60px 1fr 80px 80px 80px 80px', gap: '8px',
+                    padding: '14px 18px', alignItems: 'center',
+                    background: isLider ? 'rgba(245,168,0,0.1)' : isClassificado ? 'rgba(100,200,100,0.04)' : 'rgba(255,255,255,0.03)',
+                    border: isLider ? '1px solid rgba(245,168,0,0.35)' : isClassificado ? '1px solid rgba(100,200,100,0.15)' : '1px solid rgba(255,255,255,0.05)',
+                    clipPath: 'polygon(0 0, calc(100% - 8px) 0, 100% 8px, 100% 100%, 8px 100%, 0 calc(100% - 8px))',
+                  }}>
+                    {/* Posição */}
+                    <span style={{ fontFamily: "'Barlow Condensed', sans-serif", fontWeight: 900, fontStyle: 'italic', fontSize: isLider ? '22px' : '18px', color: isLider ? '#F5A800' : isClassificado ? 'rgba(100,200,100,0.8)' : 'rgba(255,255,255,0.3)' }}>
+                      {isLider ? '👑' : `${i + 1}º`}
+                    </span>
+
+                    {/* Nome */}
+                    <span style={{ fontFamily: "'Barlow Condensed', sans-serif", fontWeight: 900, fontStyle: 'italic', fontSize: '18px', textTransform: 'uppercase', color: '#fff' }}>
+                      {mc.nome_artistico}
+                    </span>
+
+                    {/* Batalhas */}
+                    <span style={{ fontFamily: "'Barlow Condensed', sans-serif", fontWeight: 700, fontSize: '15px', color: 'rgba(255,255,255,0.4)', textAlign: 'center' }}>{mc.total_noites}</span>
+
+                    {/* Títulos */}
+                    <span style={{ fontFamily: "'Barlow Condensed', sans-serif", fontWeight: 700, fontSize: '15px', color: 'rgba(255,255,255,0.4)', textAlign: 'center' }}>{mc.total_titulos}</span>
+
+                    {/* Lavadas */}
+                    <span style={{ fontFamily: "'Barlow Condensed', sans-serif", fontWeight: 700, fontSize: '15px', color: mc.total_lavadas > 0 ? '#F5A800' : 'rgba(255,255,255,0.4)', textAlign: 'center' }}>{mc.total_lavadas}</span>
+
+                    {/* Pontos */}
+                    <span style={{ fontFamily: "'Barlow Condensed', sans-serif", fontWeight: 900, fontStyle: 'italic', fontSize: '18px', color: isLider ? '#F5A800' : isClassificado ? 'rgba(100,200,100,0.9)' : 'rgba(255,255,255,0.6)', textAlign: 'center' }}>{mc.total_pontos}</span>
+                  </div>
+                )
+              })}
+            </div>
+
+            {/* Legenda colunas */}
+            <div style={{ display: 'flex', gap: '16px', marginTop: '20px', flexWrap: 'wrap' }}>
+              {['B = Batalhas', 'T = Títulos', 'L = Twolalas', 'PTS = Pontos'].map(l => (
+                <span key={l} style={{ fontFamily: "'Barlow Condensed', sans-serif", fontWeight: 700, fontSize: '11px', textTransform: 'uppercase', color: 'rgba(255,255,255,0.25)', letterSpacing: '0.5px' }}>{l}</span>
+              ))}
+            </div>
+          </>
         )}
       </div>
     </main>
