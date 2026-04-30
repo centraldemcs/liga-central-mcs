@@ -19,7 +19,8 @@ export default function BatalhasCadastro() {
     nome: '', cidade: '', estado: 'SP', endereco: '',
     dias_semana: '', horario: '', instagram: '',
     distribuidora: '', spotify_url: '', sem_spotify: false,
-    email: '', senha: '',
+    responsavel_nome: '', responsavel_email: '', responsavel_telefone: '',
+    responsavel_cpf: '', responsavel_nascimento: '', senha: '',
   })
 
   function set(field: string, value: any) { setForm(f => ({ ...f, [field]: value })) }
@@ -39,10 +40,21 @@ export default function BatalhasCadastro() {
       if (!form.sem_spotify && !form.spotify_url) { setErro('Informe o perfil no Spotify ou marque que não tem.'); return }
       setEtapa(3)
     } else if (etapa === 3) {
-      if (!form.email || !form.senha) { setErro('Preencha todos os campos.'); return }
+      if (!form.responsavel_nome || !form.responsavel_email || !form.responsavel_telefone || !form.responsavel_cpf || !form.responsavel_nascimento) {
+        setErro('Preencha todos os campos do responsável.'); return
+      }
+      if (!form.senha) { setErro('Defina uma senha.'); return }
       setLoading(true)
-      const { data: authData, error: authError } = await supabase.auth.signUp({ email: form.email, password: form.senha })
-      if (authError) { setErro(authError.message); setLoading(false); return }
+      const { data: authData, error: authError } = await supabase.auth.signUp({ email: form.responsavel_email, password: form.senha })
+      if (authError) {
+        if (authError.message.includes('already registered')) {
+          setErro('Este e-mail já está cadastrado. Use a opção Entrar abaixo.')
+        } else {
+          setErro(authError.message)
+        }
+        setLoading(false)
+        return
+      }
       if (authData.user) {
         const slug = form.nome.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/[^a-z0-9\s]/g, '').replace(/\s+/g, '-')
         const { error: batError } = await supabase.from('batalhas').insert({
@@ -56,6 +68,11 @@ export default function BatalhasCadastro() {
           instagram: form.instagram,
           distribuidora: getDistribuidoraFinal(),
           spotify_url: form.sem_spotify ? null : form.spotify_url,
+          responsavel_nome: form.responsavel_nome,
+          responsavel_email: form.responsavel_email,
+          responsavel_telefone: form.responsavel_telefone,
+          responsavel_cpf: form.responsavel_cpf,
+          responsavel_nascimento: form.responsavel_nascimento,
           status: 'pendente',
           organizador_id: authData.user.id,
         })
@@ -75,7 +92,7 @@ export default function BatalhasCadastro() {
       <div style={{ width: '100%', maxWidth: '480px' }}>
 
         <Link href="/" style={{ fontFamily: 'Barlow Condensed, sans-serif', fontWeight: 700, fontSize: '13px', textTransform: 'uppercase', color: 'rgba(255,255,255,0.4)', textDecoration: 'none', letterSpacing: '1px', display: 'block', marginBottom: '32px' }}>
-          ← Voltar
+          Voltar
         </Link>
 
         <div style={{ marginBottom: '32px' }}>
@@ -175,15 +192,33 @@ export default function BatalhasCadastro() {
           {etapa === 3 && (
             <>
               <div style={{ background: 'rgba(245,168,0,0.08)', border: '1px solid rgba(245,168,0,0.2)', padding: '16px', marginBottom: '4px' }}>
-                <p style={{ fontFamily: 'Barlow Condensed, sans-serif', fontWeight: 900, fontStyle: 'italic', fontSize: '16px', textTransform: 'uppercase', color: '#F5A800', marginBottom: '4px' }}>Quase lá!</p>
-                <p style={{ fontFamily: 'Barlow Condensed, sans-serif', fontWeight: 700, fontSize: '13px', color: 'rgba(255,255,255,0.5)', textTransform: 'uppercase' }}>Crie o acesso para gerenciar sua batalha na Liga.</p>
+                <p style={{ fontFamily: 'Barlow Condensed, sans-serif', fontWeight: 900, fontStyle: 'italic', fontSize: '16px', textTransform: 'uppercase', color: '#F5A800', marginBottom: '4px' }}>Dados do Responsável</p>
+                <p style={{ fontFamily: 'Barlow Condensed, sans-serif', fontWeight: 700, fontSize: '13px', color: 'rgba(255,255,255,0.5)', textTransform: 'uppercase' }}>Pessoa responsável pela batalha na Liga.</p>
               </div>
               <div>
-                <label style={labelStyle}>E-mail</label>
-                <input type="email" style={inputStyle} placeholder="seu@email.com" value={form.email} onChange={e => set('email', e.target.value)} />
+                <label style={labelStyle}>Nome Completo *</label>
+                <input style={inputStyle} placeholder="Nome do responsável" value={form.responsavel_nome} onChange={e => set('responsavel_nome', e.target.value)} />
+              </div>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
+                <div>
+                  <label style={labelStyle}>CPF *</label>
+                  <input style={inputStyle} placeholder="000.000.000-00" value={form.responsavel_cpf} onChange={e => set('responsavel_cpf', e.target.value)} />
+                </div>
+                <div>
+                  <label style={labelStyle}>Nascimento *</label>
+                  <input type="date" style={inputStyle} value={form.responsavel_nascimento} onChange={e => set('responsavel_nascimento', e.target.value)} />
+                </div>
               </div>
               <div>
-                <label style={labelStyle}>Senha</label>
+                <label style={labelStyle}>Telefone *</label>
+                <input style={inputStyle} placeholder="(11) 99999-9999" value={form.responsavel_telefone} onChange={e => set('responsavel_telefone', e.target.value)} />
+              </div>
+              <div>
+                <label style={labelStyle}>E-mail *</label>
+                <input type="email" style={inputStyle} placeholder="seu@email.com" value={form.responsavel_email} onChange={e => set('responsavel_email', e.target.value)} />
+              </div>
+              <div>
+                <label style={labelStyle}>Senha *</label>
                 <input type="password" style={inputStyle} placeholder="Mínimo 6 caracteres" value={form.senha} onChange={e => set('senha', e.target.value)} />
               </div>
             </>
@@ -199,7 +234,7 @@ export default function BatalhasCadastro() {
 
           {etapa > 1 && (
             <button onClick={() => setEtapa(e => e - 1)} style={{ background: 'none', border: 'none', color: 'rgba(255,255,255,0.35)', fontFamily: 'Barlow Condensed, sans-serif', fontWeight: 700, fontSize: '13px', textTransform: 'uppercase', cursor: 'pointer', letterSpacing: '1px' }}>
-              ← Voltar
+              Voltar
             </button>
           )}
         </div>
