@@ -70,7 +70,6 @@ export default function AdminConfrontos() {
     return p === '2x0' || p === '3x0'
   }
 
-  // Pontos para o PERDEDOR de cada fase
   function getPontosLoser(fase: string) {
     if (form.vagas === 16) {
       if (fase === 'oitavas') return 0
@@ -83,13 +82,11 @@ export default function AdminConfrontos() {
       if (fase === 'semifinal') return 1
       if (fase === 'final') return 3
     }
-    // vagas === 4
     if (fase === 'semifinal') return 0
     if (fase === 'final') return 1
     return 0
   }
 
-  // Pontos para o VENCEDOR da final
   function getPontosWinner() {
     if (form.vagas === 16) return 7
     if (form.vagas === 8) return 5
@@ -146,7 +143,7 @@ export default function AdminConfrontos() {
       cidade: 'São Paulo',
       estado: 'SP',
       whatsapp: '',
-      email: `${nome.toLowerCase().replace(/\s/g,'').replace(/[^a-z0-9]/g,'')}${Date.now()}@ligacentral.com`,
+      email: `${nome.toLowerCase().replace(/\s/g, '').replace(/[^a-z0-9]/g, '')}${Date.now()}@ligacentral.com`,
       aceite_termos: false,
     }).select().single()
     if (error) { setErro('Erro ao criar MC: ' + error.message); return null }
@@ -175,14 +172,11 @@ export default function AdminConfrontos() {
       lavada,
     }).select().single()
 
-    if (confError) { setErro('Erro: ' + confError.message); setSalvando(false); return }
+    if (confError) { setErro('Erro ao salvar confronto: ' + confError.message); setSalvando(false); return }
 
     if (conf) {
-      const pontuacoesParaInserir = []
-
-      // Perdedor recebe pontos pela fase que saiu
+      const pontuacoesParaInserir: any[] = []
       const ptsPerdedor = getPontosLoser(faseAtual)
-      const ptsBonusPerdedor = lavada ? 1 : 0 // bônus vai para o vencedor, não perdedor
 
       if (ptsPerdedor > 0) {
         pontuacoesParaInserir.push({
@@ -195,7 +189,6 @@ export default function AdminConfrontos() {
         })
       }
 
-      // Se for a final, vencedor recebe pontos de campeão + bônus lavada
       if (isFinal) {
         const ptsVencedor = getPontosWinner() + (lavada ? 1 : 0)
         pontuacoesParaInserir.push({
@@ -207,7 +200,6 @@ export default function AdminConfrontos() {
           bonus_lavada: lavada,
         })
       } else if (lavada) {
-        // Fora da final, bônus de lavada vai para o vencedor
         pontuacoesParaInserir.push({
           mc_id: vencedorMc.id,
           confronto_id: conf.id,
@@ -219,7 +211,12 @@ export default function AdminConfrontos() {
       }
 
       if (pontuacoesParaInserir.length > 0) {
-        await supabase.from('pontuacoes').insert(pontuacoesParaInserir)
+        const { error: ptsError } = await supabase.from('pontuacoes').insert(pontuacoesParaInserir)
+        if (ptsError) {
+          setErro('Erro ao salvar pontuacoes: ' + ptsError.message)
+          setSalvando(false)
+          return
+        }
       }
 
       const novoConfronto = {
@@ -258,7 +255,11 @@ export default function AdminConfrontos() {
   const mcsFiltradosB = mcs.filter(m => m.nome_artistico.toLowerCase().includes(searchB.toLowerCase()) && m.id !== mcA?.id)
   const faseLabel: any = { oitavas: 'Oitavas de final', quartas: 'Quartas de final', semifinal: 'Semifinal', final: 'Final' }
 
-  if (loading) return <main className="min-h-screen bg-zinc-950 text-white flex items-center justify-center"><p className="text-zinc-500">Carregando...</p></main>
+  if (loading) return (
+    <main className="min-h-screen bg-zinc-950 text-white flex items-center justify-center">
+      <p className="text-zinc-500">Carregando...</p>
+    </main>
+  )
 
   return (
     <main className="min-h-screen bg-zinc-950 text-white px-4 py-8">
@@ -330,7 +331,6 @@ export default function AdminConfrontos() {
               <span className="text-sm font-medium text-emerald-400">{faseLabel[faseAtual]}</span>
               <span className="text-zinc-500 text-xs">{confrontos.filter(c => c.fase === faseAtual).length}/{getMatchesPorFase(faseAtual)} confrontos</span>
             </div>
-
             <div>
               <label className="text-sm text-zinc-400 block mb-1">MC A</label>
               <input
@@ -361,7 +361,6 @@ export default function AdminConfrontos() {
               )}
               {mcA && <p className="text-emerald-400 text-xs mt-1">✓ {mcA.nome_artistico}</p>}
             </div>
-
             <div>
               <label className="text-sm text-zinc-400 block mb-1">MC B</label>
               <input
@@ -392,7 +391,6 @@ export default function AdminConfrontos() {
               )}
               {mcB && <p className="text-emerald-400 text-xs mt-1">✓ {mcB.nome_artistico}</p>}
             </div>
-
             {mcA && mcB && (
               <>
                 <div>
@@ -416,13 +414,11 @@ export default function AdminConfrontos() {
                 )}
               </>
             )}
-
             {vencedor && (
               <button onClick={salvarConfronto} disabled={salvando} className="w-full bg-emerald-500 hover:bg-emerald-400 disabled:bg-zinc-800 text-black font-semibold py-3 rounded-lg transition-colors">
                 {salvando ? 'Salvando...' : 'Confirmar confronto →'}
               </button>
             )}
-
             {confrontos.length > 0 && (
               <div className="mt-2">
                 <div className="flex items-center justify-between mb-2">
