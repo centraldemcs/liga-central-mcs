@@ -75,6 +75,7 @@ export default function BatalhasCadastro() {
           responsavel_nascimento: form.responsavel_nascimento,
           status: 'pendente',
           organizador_id: authData.user.id,
+          profile_id: authData.user.id,
         })
         if (batError) { setErro(batError.message); setLoading(false); return }
         await supabase.from('profiles').upsert({ id: authData.user.id, tipo: 'organizador' })
