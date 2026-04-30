@@ -58,6 +58,13 @@ export default function BatalhasCadastro() {
       }
 
       if (authData.user) {
+        // PRIMEIRO cria o profile
+        const { error: profileError } = await supabase
+          .from('profiles')
+          .upsert({ id: authData.user.id, tipo: 'organizador' })
+        
+        if (profileError) { setErro('Erro ao criar perfil: ' + profileError.message); setLoading(false); return }
+
         // Verifica se já existe uma batalha com esse nome
         const { data: batalhaExistente } = await supabase
           .from('batalhas')
@@ -81,7 +88,7 @@ export default function BatalhasCadastro() {
             })
             .eq('id', batalhaExistente.id)
 
-          if (updateError) { setErro(updateError.message); setLoading(false); return }
+          if (updateError) { setErro('Erro ao linkar batalha: ' + updateError.message); setLoading(false); return }
         } else {
           // Cria batalha nova
           const slug = form.nome.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/[^a-z0-9\s]/g, '').replace(/\s+/g, '-')
@@ -105,10 +112,9 @@ export default function BatalhasCadastro() {
             organizador_id: authData.user.id,
             profile_id: authData.user.id,
           })
-          if (batError) { setErro(batError.message); setLoading(false); return }
+          if (batError) { setErro('Erro ao cadastrar batalha: ' + batError.message); setLoading(false); return }
         }
 
-        await supabase.from('profiles').upsert({ id: authData.user.id, tipo: 'organizador' })
         router.push('/batalha/dashboard')
       }
       setLoading(false)
