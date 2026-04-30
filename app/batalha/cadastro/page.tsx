@@ -45,6 +45,7 @@ export default function BatalhasCadastro() {
       }
       if (!form.senha) { setErro('Defina uma senha.'); return }
       setLoading(true)
+
       const { data: authData, error: authError } = await supabase.auth.signUp({ email: form.responsavel_email, password: form.senha })
       if (authError) {
         if (authError.message.includes('already registered')) {
@@ -55,29 +56,58 @@ export default function BatalhasCadastro() {
         setLoading(false)
         return
       }
+
       if (authData.user) {
-        const slug = form.nome.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/[^a-z0-9\s]/g, '').replace(/\s+/g, '-')
-        const { error: batError } = await supabase.from('batalhas').insert({
-          nome: form.nome,
-          slug,
-          cidade: form.cidade,
-          estado: form.estado,
-          endereco: form.endereco,
-          dias_semana: form.dias_semana,
-          horario: form.horario,
-          instagram: form.instagram,
-          distribuidora: getDistribuidoraFinal(),
-          spotify_url: form.sem_spotify ? null : form.spotify_url,
-          responsavel_nome: form.responsavel_nome,
-          responsavel_email: form.responsavel_email,
-          responsavel_telefone: form.responsavel_telefone,
-          responsavel_cpf: form.responsavel_cpf,
-          responsavel_nascimento: form.responsavel_nascimento,
-          status: 'pendente',
-          organizador_id: authData.user.id,
-          profile_id: authData.user.id,
-        })
-        if (batError) { setErro(batError.message); setLoading(false); return }
+        // Verifica se já existe uma batalha com esse nome
+        const { data: batalhaExistente } = await supabase
+          .from('batalhas')
+          .select('id')
+          .ilike('nome', form.nome.trim())
+          .is('profile_id', null)
+          .single()
+
+        if (batalhaExistente) {
+          // Linka o usuário com a batalha existente
+          const { error: updateError } = await supabase
+            .from('batalhas')
+            .update({
+              profile_id: authData.user.id,
+              organizador_id: authData.user.id,
+              responsavel_nome: form.responsavel_nome,
+              responsavel_email: form.responsavel_email,
+              responsavel_telefone: form.responsavel_telefone,
+              responsavel_cpf: form.responsavel_cpf,
+              responsavel_nascimento: form.responsavel_nascimento,
+            })
+            .eq('id', batalhaExistente.id)
+
+          if (updateError) { setErro(updateError.message); setLoading(false); return }
+        } else {
+          // Cria batalha nova
+          const slug = form.nome.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/[^a-z0-9\s]/g, '').replace(/\s+/g, '-')
+          const { error: batError } = await supabase.from('batalhas').insert({
+            nome: form.nome,
+            slug,
+            cidade: form.cidade,
+            estado: form.estado,
+            endereco: form.endereco,
+            dias_semana: form.dias_semana,
+            horario: form.horario,
+            instagram: form.instagram,
+            distribuidora: getDistribuidoraFinal(),
+            spotify_url: form.sem_spotify ? null : form.spotify_url,
+            responsavel_nome: form.responsavel_nome,
+            responsavel_email: form.responsavel_email,
+            responsavel_telefone: form.responsavel_telefone,
+            responsavel_cpf: form.responsavel_cpf,
+            responsavel_nascimento: form.responsavel_nascimento,
+            status: 'pendente',
+            organizador_id: authData.user.id,
+            profile_id: authData.user.id,
+          })
+          if (batError) { setErro(batError.message); setLoading(false); return }
+        }
+
         await supabase.from('profiles').upsert({ id: authData.user.id, tipo: 'organizador' })
         router.push('/batalha/dashboard')
       }
