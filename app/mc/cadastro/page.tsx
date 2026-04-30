@@ -6,7 +6,7 @@ import { useRouter } from 'next/navigation'
 
 const ESTADOS = ['AC','AL','AP','AM','BA','CE','DF','ES','GO','MA','MT','MS','MG','PA','PB','PR','PE','PI','RJ','RN','RS','RO','RR','SC','SP','SE','TO']
 
-export default function Mccadastro() {
+export default function McCadastro() {
   const supabase = createClient()
   const router = useRouter()
   const [etapa, setEtapa] = useState(1)
@@ -31,21 +31,67 @@ export default function Mccadastro() {
       if (!form.email || !form.senha) { setErro('Preencha todos os campos.'); return }
       if (!form.aceite_termos) { setErro('Aceite os termos para continuar.'); return }
       setLoading(true)
+
       const { data: authData, error: authError } = await supabase.auth.signUp({ email: form.email, password: form.senha })
-      if (authError) { setErro(authError.message); setLoading(false); return }
+      if (authError) {
+        if (authError.message.includes('already registered')) {
+          setErro('Este e-mail já está cadastrado. Use a opção Entrar abaixo.')
+        } else {
+          setErro(authError.message)
+        }
+        setLoading(false)
+        return
+      }
+
       if (authData.user) {
-        const { error: mcError } = await supabase.from('mcs').insert({
-          nome_completo: form.nome_completo,
-          nome_artistico: form.nome_artistico,
-          data_nascimento: form.data_nascimento,
-          cidade: form.cidade,
-          estado: form.estado,
-          whatsapp: form.whatsapp,
-          email: form.email,
-          aceite_termos: form.aceite_termos,
-        })
-        if (mcError) { setErro(mcError.message); setLoading(false); return }
-        await supabase.from('profiles').upsert({ id: authData.user.id, tipo: 'mc' })
+        // PRIMEIRO cria o profile
+        const { error: profileError } = await supabase
+          .from('profiles')
+          .upsert({ id: authData.user.id, tipo: 'mc' })
+
+        if (profileError) { setErro('Erro ao criar perfil: ' + profileError.message); setLoading(false); return }
+
+        // Verifica se já existe MC com esse nome artístico sem profile
+        const { data: mcExistente } = await supabase
+          .from('mcs')
+          .select('id')
+          .ilike('nome_artistico', form.nome_artistico.trim())
+          .is('profile_id', null)
+          .single()
+
+        if (mcExistente) {
+          // Linka com MC existente
+          const { error: updateError } = await supabase
+            .from('mcs')
+            .update({
+              profile_id: authData.user.id,
+              nome_completo: form.nome_completo,
+              data_nascimento: form.data_nascimento,
+              cidade: form.cidade,
+              estado: form.estado,
+              whatsapp: form.whatsapp,
+              email: form.email,
+              aceite_termos: form.aceite_termos,
+            })
+            .eq('id', mcExistente.id)
+
+          if (updateError) { setErro('Erro ao linkar MC: ' + updateError.message); setLoading(false); return }
+        } else {
+          // Cria MC novo
+          const { error: mcError } = await supabase.from('mcs').insert({
+            profile_id: authData.user.id,
+            nome_completo: form.nome_completo,
+            nome_artistico: form.nome_artistico,
+            data_nascimento: form.data_nascimento,
+            cidade: form.cidade,
+            estado: form.estado,
+            whatsapp: form.whatsapp,
+            email: form.email,
+            aceite_termos: form.aceite_termos,
+          })
+          if (mcError) { setErro('Erro ao cadastrar MC: ' + mcError.message); setLoading(false); return }
+        }
+
         router.push('/mc/dashboard')
       }
       setLoading(false)
@@ -60,7 +106,7 @@ export default function Mccadastro() {
       <div style={{ width: '100%', maxWidth: '480px' }}>
 
         <Link href="/" style={{ fontFamily: 'Barlow Condensed, sans-serif', fontWeight: 700, fontSize: '13px', textTransform: 'uppercase', color: 'rgba(255,255,255,0.4)', textDecoration: 'none', letterSpacing: '1px', display: 'block', marginBottom: '32px' }}>
-          ← Voltar
+          Voltar
         </Link>
 
         <div style={{ marginBottom: '32px' }}>
@@ -151,7 +197,7 @@ export default function Mccadastro() {
 
           {etapa > 1 && (
             <button onClick={() => setEtapa(e => e - 1)} style={{ background: 'none', border: 'none', color: 'rgba(255,255,255,0.35)', fontFamily: 'Barlow Condensed, sans-serif', fontWeight: 700, fontSize: '13px', textTransform: 'uppercase', cursor: 'pointer', letterSpacing: '1px' }}>
-              ← Voltar
+              Voltar
             </button>
           )}
         </div>
