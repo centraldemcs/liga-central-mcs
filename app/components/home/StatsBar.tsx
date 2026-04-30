@@ -16,7 +16,9 @@ export default function StatsBar({ totalMcs, totalBatalhas, winRateLider }: Stat
       <div style={{ width: '1px', height: '36px', background: 'rgba(0,0,0,0.18)' }} />
       <StatItem value="R$250" label="Premiação Semanal" />
       <div style={{ width: '1px', height: '36px', background: 'rgba(0,0,0,0.18)' }} />
-      <StatItem value={`${winRateLider.toFixed(1)}%`} label="Win-Rate do Líder" />
+      <StatItem value="R$10.000" label="Premiação Anual" />
+      <div style={{ width: '1px', height: '36px', background: 'rgba(0,0,0,0.18)' }} />
+      <StatItem value={`${winRateLider.toFixed(1)}%`} label="Win-Rate do Líder da Semana" />
     </div>
   )
 }
