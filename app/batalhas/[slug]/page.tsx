@@ -22,8 +22,9 @@ export default async function BatalhaPage({ params }: { params: Promise<{ slug: 
 
   const { data: ptsData } = await supabase
     .from('pontuacoes')
-    .select('mc_id, pontos, mcs(nome_artistico, cidade)')
+    .select('mc_id, pontos, mcs(nome_artistico, cidade), confronto_id')
     .eq('batalha_id', batalha.id)
+    .not('confronto_id', 'is', null)
 
   const mcMap: any = {}
   ptsData?.forEach((p: any) => {
@@ -63,7 +64,7 @@ export default async function BatalhaPage({ params }: { params: Promise<{ slug: 
           )}
         </div>
         <Link href="/" style={{ background: '#111', color: '#F5A800', fontFamily: "'Barlow Condensed', sans-serif", fontWeight: 900, fontStyle: 'italic', fontSize: '13px', textTransform: 'uppercase', padding: '10px 20px', textDecoration: 'none', clipPath: 'polygon(8px 0, 100% 0, calc(100% - 8px) 100%, 0 100%)' }}>
-          ← Início
+          Inicio
         </Link>
       </div>
 
@@ -72,7 +73,7 @@ export default async function BatalhaPage({ params }: { params: Promise<{ slug: 
           <StatCard label="Noites" value={(noites?.length ?? 0).toString()} />
           <StatCard label="MCs" value={ranking.length.toString()} />
           <StatCard label="Cidade" value={batalha.cidade} />
-          {maiorCampeao && <StatCard label="Maior Campeão" value={maiorCampeao.nome} sub={`${maiorCampeao.total} título${maiorCampeao.total > 1 ? 's' : ''}`} />}
+          {maiorCampeao && <StatCard label="Maior Campeao" value={maiorCampeao.nome} sub={maiorCampeao.total + ' titulo' + (maiorCampeao.total > 1 ? 's' : '')} />}
         </div>
 
         {batalha.descricao && (
@@ -83,11 +84,11 @@ export default async function BatalhaPage({ params }: { params: Promise<{ slug: 
         )}
 
         <div style={{ marginBottom: '32px' }}>
-          <h2 style={{ fontFamily: "'Barlow Condensed', sans-serif", fontWeight: 900, fontStyle: 'italic', fontSize: '28px', textTransform: 'uppercase', color: '#fff', marginBottom: '16px', borderBottom: '1px solid rgba(245,168,0,0.2)', paddingBottom: '12px' }}>Informações</h2>
+          <h2 style={{ fontFamily: "'Barlow Condensed', sans-serif", fontWeight: 900, fontStyle: 'italic', fontSize: '28px', textTransform: 'uppercase', color: '#fff', marginBottom: '16px', borderBottom: '1px solid rgba(245,168,0,0.2)', paddingBottom: '12px' }}>Informacoes</h2>
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '12px' }}>
-            {batalha.endereco && <InfoCard icon="📍" label="Endereço" value={batalha.endereco} />}
-            {batalha.dias_semana && <InfoCard icon="📅" label="Quando" value={`${batalha.dias_semana}${batalha.horario ? ` às ${batalha.horario}` : ''}`} />}
-            {batalha.instagram && <InfoCard icon="📸" label="Instagram" value={`@${batalha.instagram}`} />}
+            {batalha.endereco && <InfoCard icon="📍" label="Endereco" value={batalha.endereco} />}
+            {batalha.dias_semana && <InfoCard icon="📅" label="Quando" value={batalha.dias_semana + (batalha.horario ? ' as ' + batalha.horario : '')} />}
+            {batalha.instagram && <InfoCard icon="📸" label="Instagram" value={'@' + batalha.instagram} />}
             {batalha.distribuidora && <InfoCard icon="🎵" label="Distribuidora" value={batalha.distribuidora} />}
           </div>
         </div>
@@ -99,7 +100,7 @@ export default async function BatalhaPage({ params }: { params: Promise<{ slug: 
               {ranking.slice(0, 10).map((m: any, i) => (
                 <div key={i} style={{ display: 'flex', alignItems: 'center', gap: '14px', background: i === 0 ? 'rgba(245,168,0,0.1)' : 'rgba(255,255,255,0.035)', border: i === 0 ? '1px solid rgba(245,168,0,0.4)' : '1px solid rgba(255,255,255,0.06)', padding: '12px 18px', clipPath: 'polygon(0 0, calc(100% - 10px) 0, 100% 10px, 100% 100%, 10px 100%, 0 calc(100% - 10px))' }}>
                   <span style={{ fontFamily: "'Barlow Condensed', sans-serif", fontWeight: 900, fontStyle: 'italic', fontSize: i === 0 ? '22px' : '18px', color: i === 0 ? '#F5A800' : 'rgba(255,255,255,0.25)', minWidth: '32px', textAlign: 'center' }}>
-                    {i === 0 ? '👑' : `${i + 1}º`}
+                    {i === 0 ? '👑' : (i + 1) + 'º'}
                   </span>
                   <div style={{ flex: 1 }}>
                     <p style={{ fontFamily: "'Barlow Condensed', sans-serif", fontWeight: 900, fontStyle: 'italic', fontSize: '18px', textTransform: 'uppercase', color: '#fff' }}>{m.mc?.nome_artistico}</p>
@@ -113,7 +114,7 @@ export default async function BatalhaPage({ params }: { params: Promise<{ slug: 
         )}
 
         <div>
-          <h2 style={{ fontFamily: "'Barlow Condensed', sans-serif", fontWeight: 900, fontStyle: 'italic', fontSize: '28px', textTransform: 'uppercase', color: '#fff', marginBottom: '16px', borderBottom: '1px solid rgba(245,168,0,0.2)', paddingBottom: '12px' }}>Histórico de Noites</h2>
+          <h2 style={{ fontFamily: "'Barlow Condensed', sans-serif", fontWeight: 900, fontStyle: 'italic', fontSize: '28px', textTransform: 'uppercase', color: '#fff', marginBottom: '16px', borderBottom: '1px solid rgba(245,168,0,0.2)', paddingBottom: '12px' }}>Historico de Noites</h2>
           {!noites || noites.length === 0 ? (
             <div style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.06)', padding: '32px', textAlign: 'center' }}>
               <p style={{ fontFamily: "'Barlow Condensed', sans-serif", fontWeight: 700, fontSize: '16px', color: 'rgba(255,255,255,0.4)', textTransform: 'uppercase' }}>Nenhuma noite registrada ainda.</p>
