@@ -14,24 +14,31 @@ export default function AdminConfrontos() {
   const router = useRouter()
   const supabase = createClient()
 
-  const [form, setForm] = useState({
-    batalha_id: '',
-    data: '',
-    formato: '1x1',
-    vagas: 8,
-    rounds: 3,
-  })
-
+  const [form, setForm] = useState({ batalha_id: '', data: '', formato: '1x1', vagas: 8, rounds: 3 })
   const [confrontos, setConfrontos] = useState<any[]>([])
   const [faseAtual, setFaseAtual] = useState('')
-  const [mcA, setMcA] = useState<any>(null)
-  const [mcB, setMcB] = useState<any>(null)
-  const [placar, setPlacar] = useState('')
-  const [vencedor, setVencedor] = useState('')
-  const [searchA, setSearchA] = useState('')
-  const [searchB, setSearchB] = useState('')
   const [noiteId, setNoiteId] = useState<string | null>(null)
   const [etapa, setEtapa] = useState<'config' | 'confrontos'>('config')
+
+  const numMcs = parseInt(form.formato.split('x')[0])
+
+  // Times: arrays de MCs por lado
+  const [timeA, setTimeA] = useState<(any | null)[]>([null])
+  const [timeB, setTimeB] = useState<(any | null)[]>([null])
+  const [searchA, setSearchA] = useState<string[]>([''])
+  const [searchB, setSearchB] = useState<string[]>([''])
+  const [placar, setPlacar] = useState('')
+  const [vencedor, setVencedor] = useState('')
+
+  useEffect(() => {
+    const n = numMcs
+    setTimeA(Array(n).fill(null))
+    setTimeB(Array(n).fill(null))
+    setSearchA(Array(n).fill(''))
+    setSearchB(Array(n).fill(''))
+    setPlacar('')
+    setVencedor('')
+  }, [form.formato])
 
   useEffect(() => {
     async function load() {
@@ -66,9 +73,7 @@ export default function AdminConfrontos() {
     return ['3x0', '3x1', '3x2']
   }
 
-  function isLavada(p: string) {
-    return p === '2x0' || p === '3x0'
-  }
+  function isLavada(p: string) { return p === '2x0' || p === '3x0' }
 
   function getPontosLoser(fase: string) {
     if (form.vagas === 16) {
@@ -97,18 +102,11 @@ export default function AdminConfrontos() {
     if (!form.batalha_id || !form.data) { setErro('Preencha todos os campos.'); return }
     setErro('')
     const { data, error } = await supabase.from('noites').insert({
-      batalha_id: form.batalha_id,
-      data: form.data,
-      formato: form.formato,
-      vagas: form.vagas,
-      rounds: form.rounds,
+      batalha_id: form.batalha_id, data: form.data,
+      formato: form.formato, vagas: form.vagas, rounds: form.rounds,
     }).select().single()
     if (error) { setErro('Erro ao criar noite: ' + error.message); return }
-    if (data) {
-      setNoiteId(data.id)
-      setFaseAtual(getFases()[0])
-      setEtapa('confrontos')
-    }
+    if (data) { setNoiteId(data.id); setFaseAtual(getFases()[0]); setEtapa('confrontos') }
   }
 
   async function cancelarNoite() {
@@ -117,11 +115,8 @@ export default function AdminConfrontos() {
     await supabase.from('pontuacoes').delete().eq('noite_id', noiteId)
     await supabase.from('confrontos').delete().eq('noite_id', noiteId)
     await supabase.from('noites').delete().eq('id', noiteId)
-    setConfrontos([])
-    setNoiteId(null)
-    setFaseAtual('')
-    setEtapa('config')
-    setMcA(null); setMcB(null); setPlacar(''); setVencedor(''); setSearchA(''); setSearchB('')
+    setConfrontos([]); setNoiteId(null); setFaseAtual(''); setEtapa('config')
+    resetCampos()
   }
 
   async function desfazerUltimo() {
@@ -129,21 +124,23 @@ export default function AdminConfrontos() {
     const ultimo = confrontos[confrontos.length - 1]
     await supabase.from('pontuacoes').delete().eq('confronto_id', ultimo.confronto_id)
     await supabase.from('confrontos').delete().eq('id', ultimo.confronto_id)
-    const novosConfrontos = confrontos.slice(0, -1)
-    setConfrontos(novosConfrontos)
+    setConfrontos(confrontos.slice(0, -1))
     setFaseAtual(ultimo.fase)
-    setMcA(null); setMcB(null); setPlacar(''); setVencedor(''); setSearchA(''); setSearchB('')
+    resetCampos()
+  }
+
+  function resetCampos() {
+    const n = numMcs
+    setTimeA(Array(n).fill(null)); setTimeB(Array(n).fill(null))
+    setSearchA(Array(n).fill('')); setSearchB(Array(n).fill(''))
+    setPlacar(''); setVencedor('')
   }
 
   async function criarMcNoBanco(nome: string) {
     const { data, error } = await supabase.from('mcs').insert({
-      nome_completo: nome,
-      nome_artistico: nome,
-      data_nascimento: '1990-01-01',
-      cidade: 'São Paulo',
-      estado: 'SP',
-      whatsapp: '',
-      email: `${nome.toLowerCase().replace(/\s/g, '').replace(/[^a-z0-9]/g, '')}${Date.now()}@ligacentral.com`,
+      nome_completo: nome, nome_artistico: nome, data_nascimento: '1990-01-01',
+      cidade: 'São Paulo', estado: 'SP', whatsapp: '',
+      email: nome.toLowerCase().replace(/\s/g, '').replace(/[^a-z0-9]/g, '') + Date.now() + '@ligacentral.com',
       aceite_termos: false,
     }).select().single()
     if (error) { setErro('Erro ao criar MC: ' + error.message); return null }
@@ -152,81 +149,79 @@ export default function AdminConfrontos() {
   }
 
   async function salvarConfronto() {
-    if (!mcA || !mcB || !placar || !vencedor) { setErro('Preencha todos os campos do confronto.'); return }
-    setSalvando(true)
-    setErro('')
+    const timeACompleto = timeA.every(m => m !== null)
+    const timeBCompleto = timeB.every(m => m !== null)
+    if (!timeACompleto || !timeBCompleto || !placar || !vencedor) {
+      setErro('Preencha todos os campos do confronto.'); return
+    }
+    setSalvando(true); setErro('')
 
-    const vencedorMc = vencedor === 'a' ? mcA : mcB
-    const perdedorMc = vencedor === 'a' ? mcB : mcA
+    const vencedoresMcs = vencedor === 'a' ? timeA : timeB
+    const perdedoresMcs = vencedor === 'a' ? timeB : timeA
     const lavada = isLavada(placar)
     const isFinal = faseAtual === 'final'
 
-    const { data: conf, error: confError } = await supabase.from('confrontos').insert({
-      noite_id: noiteId,
-      fase: faseAtual,
-      mc_a_id: mcA.id,
-      mc_b_id: mcB.id,
-      placar,
-      rounds: form.rounds,
-      vencedor_id: vencedorMc.id,
-      lavada,
-    }).select().single()
+    const confrontoData: any = {
+      noite_id: noiteId, fase: faseAtual, placar,
+      rounds: form.rounds, lavada,
+      mc_a_id: timeA[0]?.id, mc_b_id: timeB[0]?.id,
+      vencedor_id: vencedoresMcs[0]?.id,
+    }
+    if (timeA[1]) confrontoData.mc_a2_id = timeA[1].id
+    if (timeA[2]) confrontoData.mc_a3_id = timeA[2].id
+    if (timeA[3]) confrontoData.mc_a4_id = timeA[3].id
+    if (timeB[1]) confrontoData.mc_b2_id = timeB[1].id
+    if (timeB[2]) confrontoData.mc_b3_id = timeB[2].id
+    if (timeB[3]) confrontoData.mc_b4_id = timeB[3].id
+    if (vencedoresMcs[1]) confrontoData.vencedor2_id = vencedoresMcs[1].id
+    if (vencedoresMcs[2]) confrontoData.vencedor3_id = vencedoresMcs[2].id
+    if (vencedoresMcs[3]) confrontoData.vencedor4_id = vencedoresMcs[3].id
 
+    const { data: conf, error: confError } = await supabase.from('confrontos').insert(confrontoData).select().single()
     if (confError) { setErro('Erro ao salvar confronto: ' + confError.message); setSalvando(false); return }
 
     if (conf) {
       const pontuacoesParaInserir: any[] = []
       const ptsPerdedor = getPontosLoser(faseAtual)
 
+      // Pontos para perdedores
       if (ptsPerdedor > 0) {
-        pontuacoesParaInserir.push({
-          mc_id: perdedorMc.id,
-          confronto_id: conf.id,
-          noite_id: noiteId,
-          batalha_id: form.batalha_id,
-          pontos: ptsPerdedor,
-          bonus_lavada: false,
+        perdedoresMcs.forEach((mc: any) => {
+          if (mc) pontuacoesParaInserir.push({
+            mc_id: mc.id, confronto_id: conf.id, noite_id: noiteId,
+            batalha_id: form.batalha_id, pontos: ptsPerdedor, bonus_lavada: false,
+          })
         })
       }
 
+      // Pontos para vencedores
       if (isFinal) {
         const ptsVencedor = getPontosWinner() + (lavada ? 1 : 0)
-        pontuacoesParaInserir.push({
-          mc_id: vencedorMc.id,
-          confronto_id: conf.id,
-          noite_id: noiteId,
-          batalha_id: form.batalha_id,
-          pontos: ptsVencedor,
-          bonus_lavada: lavada,
+        vencedoresMcs.forEach((mc: any) => {
+          if (mc) pontuacoesParaInserir.push({
+            mc_id: mc.id, confronto_id: conf.id, noite_id: noiteId,
+            batalha_id: form.batalha_id, pontos: ptsVencedor, bonus_lavada: lavada,
+          })
         })
       } else if (lavada) {
-        pontuacoesParaInserir.push({
-          mc_id: vencedorMc.id,
-          confronto_id: conf.id,
-          noite_id: noiteId,
-          batalha_id: form.batalha_id,
-          pontos: 1,
-          bonus_lavada: true,
+        vencedoresMcs.forEach((mc: any) => {
+          if (mc) pontuacoesParaInserir.push({
+            mc_id: mc.id, confronto_id: conf.id, noite_id: noiteId,
+            batalha_id: form.batalha_id, pontos: 1, bonus_lavada: true,
+          })
         })
       }
 
       if (pontuacoesParaInserir.length > 0) {
         const { error: ptsError } = await supabase.from('pontuacoes').insert(pontuacoesParaInserir)
-        if (ptsError) {
-          setErro('Erro ao salvar pontuacoes: ' + ptsError.message)
-          setSalvando(false)
-          return
-        }
+        if (ptsError) { setErro('Erro ao salvar pontuacoes: ' + ptsError.message); setSalvando(false); return }
       }
 
       const novoConfronto = {
-        confronto_id: conf.id,
-        fase: faseAtual,
-        mcA, mcB, placar,
-        vencedor: vencedorMc,
-        perdedor: perdedorMc,
-        ptsPerdedor,
-        ptsVencedor: isFinal ? getPontosWinner() + (lavada ? 1 : 0) : (lavada ? 1 : 0),
+        confronto_id: conf.id, fase: faseAtual,
+        timeA: [...timeA], timeB: [...timeB], placar,
+        vencedores: vencedoresMcs, perdedores: perdedoresMcs,
+        ptsPerdedor, ptsVencedor: isFinal ? getPontosWinner() + (lavada ? 1 : 0) : (lavada ? 1 : 0),
         lavada
       }
 
@@ -240,20 +235,77 @@ export default function AdminConfrontos() {
       if (confrontosDaFase.length >= totalFase) {
         const proxIdx = fases.indexOf(faseAtual) + 1
         if (proxIdx < fases.length) setFaseAtual(fases[proxIdx])
-        else {
-          setSucesso('Batalha encerrada! Todos os confrontos foram registrados.')
-          setEtapa('config')
-        }
+        else { setSucesso('Batalha encerrada! Todos os confrontos foram registrados.'); setEtapa('config') }
       }
 
-      setMcA(null); setMcB(null); setPlacar(''); setVencedor(''); setSearchA(''); setSearchB('')
+      resetCampos()
     }
     setSalvando(false)
   }
 
-  const mcsFiltradosA = mcs.filter(m => m.nome_artistico.toLowerCase().includes(searchA.toLowerCase()) && m.id !== mcB?.id)
-  const mcsFiltradosB = mcs.filter(m => m.nome_artistico.toLowerCase().includes(searchB.toLowerCase()) && m.id !== mcA?.id)
+  function getMcsFiltrados(search: string, excluir: any[]) {
+    return mcs.filter(m =>
+      m.nome_artistico.toLowerCase().includes(search.toLowerCase()) &&
+      !excluir.filter(Boolean).some((e: any) => e.id === m.id)
+    )
+  }
+
+  function renderBuscaMc(lado: 'a' | 'b', idx: number) {
+    const time = lado === 'a' ? timeA : timeB
+    const setTime = lado === 'a' ? setTimeA : setTimeB
+    const searches = lado === 'a' ? searchA : searchB
+    const setSearches = lado === 'a' ? setSearchA : setSearchB
+    const mc = time[idx]
+    const search = searches[idx]
+    const excluir = [...timeA, ...timeB].filter(Boolean)
+
+    return (
+      <div key={idx}>
+        <label className="text-xs text-zinc-500 block mb-1">MC {lado.toUpperCase()}{numMcs > 1 ? (idx + 1) : ''}</label>
+        <input
+          className="w-full bg-zinc-900 border border-zinc-800 rounded-lg px-4 py-2 text-white placeholder-zinc-600 text-sm"
+          placeholder="Buscar MC..."
+          value={search}
+          onChange={e => {
+            const newS = [...searches]; newS[idx] = e.target.value
+            lado === 'a' ? setSearchA(newS) : setSearchB(newS)
+            const newT = [...time]; newT[idx] = null
+            setTime(newT)
+          }}
+        />
+        {search && !mc && (
+          <div className="bg-zinc-900 border border-zinc-800 rounded-lg mt-1 max-h-32 overflow-y-auto">
+            {getMcsFiltrados(search, excluir).slice(0, 5).map(m => (
+              <div key={m.id} onClick={() => {
+                const newT = [...time]; newT[idx] = m; setTime(newT)
+                const newS = [...searches]; newS[idx] = m.nome_artistico
+                lado === 'a' ? setSearchA(newS) : setSearchB(newS)
+              }} className="px-4 py-2 hover:bg-zinc-800 cursor-pointer text-sm">
+                {m.nome_artistico} <span className="text-zinc-500">{m.cidade}</span>
+              </div>
+            ))}
+            {getMcsFiltrados(search, excluir).length === 0 && search.length >= 2 && (
+              <div onClick={async () => {
+                const novo = await criarMcNoBanco(search)
+                if (novo) {
+                  const newT = [...time]; newT[idx] = novo; setTime(newT)
+                  const newS = [...searches]; newS[idx] = novo.nome_artistico
+                  lado === 'a' ? setSearchA(newS) : setSearchB(newS)
+                }
+              }} className="px-4 py-2 hover:bg-zinc-800 cursor-pointer text-sm text-emerald-400">
+                + Criar MC: <strong>{search}</strong>
+              </div>
+            )}
+          </div>
+        )}
+        {mc && <p className="text-emerald-400 text-xs mt-1">✓ {mc.nome_artistico}</p>}
+      </div>
+    )
+  }
+
   const faseLabel: any = { oitavas: 'Oitavas de final', quartas: 'Quartas de final', semifinal: 'Semifinal', final: 'Final' }
+  const timeACompleto = timeA.every(m => m !== null)
+  const timeBCompleto = timeB.every(m => m !== null)
 
   if (loading) return (
     <main className="min-h-screen bg-zinc-950 text-white flex items-center justify-center">
@@ -270,9 +322,7 @@ export default function AdminConfrontos() {
             <h1 className="text-xl font-bold">Cadastrar confrontos</h1>
           </div>
           {etapa === 'confrontos' && (
-            <button onClick={cancelarNoite} className="text-red-400 hover:text-red-300 text-sm transition-colors">
-              Cancelar tudo
-            </button>
+            <button onClick={cancelarNoite} className="text-red-400 hover:text-red-300 text-sm transition-colors">Cancelar tudo</button>
           )}
         </div>
 
@@ -316,10 +366,7 @@ export default function AdminConfrontos() {
                 ))}
               </div>
             </div>
-            <button
-              onClick={criarNoite}
-              disabled={!form.batalha_id || !form.data}
-              className="w-full bg-emerald-500 hover:bg-emerald-400 disabled:bg-zinc-800 disabled:text-zinc-600 text-black font-semibold py-3 rounded-lg transition-colors mt-2">
+            <button onClick={criarNoite} disabled={!form.batalha_id || !form.data} className="w-full bg-emerald-500 hover:bg-emerald-400 disabled:bg-zinc-800 disabled:text-zinc-600 text-black font-semibold py-3 rounded-lg transition-colors mt-2">
               Começar a cadastrar →
             </button>
           </div>
@@ -331,67 +378,18 @@ export default function AdminConfrontos() {
               <span className="text-sm font-medium text-emerald-400">{faseLabel[faseAtual]}</span>
               <span className="text-zinc-500 text-xs">{confrontos.filter(c => c.fase === faseAtual).length}/{getMatchesPorFase(faseAtual)} confrontos</span>
             </div>
-            <div>
-              <label className="text-sm text-zinc-400 block mb-1">MC A</label>
-              <input
-                className="w-full bg-zinc-900 border border-zinc-800 rounded-lg px-4 py-3 text-white placeholder-zinc-600"
-                placeholder="Buscar MC..."
-                value={searchA}
-                onChange={e => { setSearchA(e.target.value); setMcA(null) }}
-              />
-              {searchA && !mcA && (
-                <div className="bg-zinc-900 border border-zinc-800 rounded-lg mt-1 max-h-40 overflow-y-auto">
-                  {mcsFiltradosA.slice(0,5).map(m => (
-                    <div key={m.id} onClick={() => { setMcA(m); setSearchA(m.nome_artistico) }} className="px-4 py-2 hover:bg-zinc-800 cursor-pointer text-sm">
-                      {m.nome_artistico} <span className="text-zinc-500">{m.cidade}</span>
-                    </div>
-                  ))}
-                  {mcsFiltradosA.length === 0 && searchA.length >= 2 && (
-                    <div
-                      onClick={async () => {
-                        const novo = await criarMcNoBanco(searchA)
-                        if (novo) { setMcA(novo); setSearchA(novo.nome_artistico) }
-                      }}
-                      className="px-4 py-2 hover:bg-zinc-800 cursor-pointer text-sm text-emerald-400"
-                    >
-                      + Criar MC: <strong>{searchA}</strong>
-                    </div>
-                  )}
-                </div>
-              )}
-              {mcA && <p className="text-emerald-400 text-xs mt-1">✓ {mcA.nome_artistico}</p>}
+
+            <div className="flex flex-col gap-2">
+              <p className="text-sm text-zinc-400 font-medium">Lado A</p>
+              {Array.from({length: numMcs}).map((_, i) => renderBuscaMc('a', i))}
             </div>
-            <div>
-              <label className="text-sm text-zinc-400 block mb-1">MC B</label>
-              <input
-                className="w-full bg-zinc-900 border border-zinc-800 rounded-lg px-4 py-3 text-white placeholder-zinc-600"
-                placeholder="Buscar MC..."
-                value={searchB}
-                onChange={e => { setSearchB(e.target.value); setMcB(null) }}
-              />
-              {searchB && !mcB && (
-                <div className="bg-zinc-900 border border-zinc-800 rounded-lg mt-1 max-h-40 overflow-y-auto">
-                  {mcsFiltradosB.slice(0,5).map(m => (
-                    <div key={m.id} onClick={() => { setMcB(m); setSearchB(m.nome_artistico) }} className="px-4 py-2 hover:bg-zinc-800 cursor-pointer text-sm">
-                      {m.nome_artistico} <span className="text-zinc-500">{m.cidade}</span>
-                    </div>
-                  ))}
-                  {mcsFiltradosB.length === 0 && searchB.length >= 2 && (
-                    <div
-                      onClick={async () => {
-                        const novo = await criarMcNoBanco(searchB)
-                        if (novo) { setMcB(novo); setSearchB(novo.nome_artistico) }
-                      }}
-                      className="px-4 py-2 hover:bg-zinc-800 cursor-pointer text-sm text-emerald-400"
-                    >
-                      + Criar MC: <strong>{searchB}</strong>
-                    </div>
-                  )}
-                </div>
-              )}
-              {mcB && <p className="text-emerald-400 text-xs mt-1">✓ {mcB.nome_artistico}</p>}
+
+            <div className="flex flex-col gap-2">
+              <p className="text-sm text-zinc-400 font-medium">Lado B</p>
+              {Array.from({length: numMcs}).map((_, i) => renderBuscaMc('b', i))}
             </div>
-            {mcA && mcB && (
+
+            {timeACompleto && timeBCompleto && (
               <>
                 <div>
                   <label className="text-sm text-zinc-400 block mb-1">Placar</label>
@@ -407,33 +405,37 @@ export default function AdminConfrontos() {
                   <div>
                     <label className="text-sm text-zinc-400 block mb-1">Vencedor</label>
                     <div className="flex gap-2">
-                      <button onClick={() => setVencedor('a')} className={`flex-1 py-2 rounded-lg border text-sm font-medium transition-colors ${vencedor === 'a' ? 'border-emerald-500 bg-emerald-500/10 text-emerald-400' : 'border-zinc-800 text-zinc-400'}`}>{mcA.nome_artistico}</button>
-                      <button onClick={() => setVencedor('b')} className={`flex-1 py-2 rounded-lg border text-sm font-medium transition-colors ${vencedor === 'b' ? 'border-emerald-500 bg-emerald-500/10 text-emerald-400' : 'border-zinc-800 text-zinc-400'}`}>{mcB.nome_artistico}</button>
+                      <button onClick={() => setVencedor('a')} className={`flex-1 py-2 rounded-lg border text-sm font-medium transition-colors ${vencedor === 'a' ? 'border-emerald-500 bg-emerald-500/10 text-emerald-400' : 'border-zinc-800 text-zinc-400'}`}>
+                        {timeA.filter(Boolean).map((m: any) => m.nome_artistico).join(' & ')}
+                      </button>
+                      <button onClick={() => setVencedor('b')} className={`flex-1 py-2 rounded-lg border text-sm font-medium transition-colors ${vencedor === 'b' ? 'border-emerald-500 bg-emerald-500/10 text-emerald-400' : 'border-zinc-800 text-zinc-400'}`}>
+                        {timeB.filter(Boolean).map((m: any) => m.nome_artistico).join(' & ')}
+                      </button>
                     </div>
                   </div>
                 )}
               </>
             )}
+
             {vencedor && (
               <button onClick={salvarConfronto} disabled={salvando} className="w-full bg-emerald-500 hover:bg-emerald-400 disabled:bg-zinc-800 text-black font-semibold py-3 rounded-lg transition-colors">
                 {salvando ? 'Salvando...' : 'Confirmar confronto →'}
               </button>
             )}
+
             {confrontos.length > 0 && (
               <div className="mt-2">
                 <div className="flex items-center justify-between mb-2">
                   <p className="text-zinc-500 text-xs uppercase tracking-wider">Registrados</p>
-                  <button onClick={desfazerUltimo} className="text-amber-400 hover:text-amber-300 text-xs transition-colors">
-                    ↩ Desfazer último
-                  </button>
+                  <button onClick={desfazerUltimo} className="text-amber-400 hover:text-amber-300 text-xs transition-colors">↩ Desfazer último</button>
                 </div>
                 {confrontos.map((c, i) => (
                   <div key={i} className="flex items-center justify-between py-2 border-b border-zinc-800 text-sm">
                     <span className="text-zinc-400 text-xs">{faseLabel[c.fase]}</span>
                     <span>
-                      <span className="text-emerald-400 font-medium">{c.vencedor.nome_artistico}</span>
+                      <span className="text-emerald-400 font-medium">{c.vencedores.filter(Boolean).map((m: any) => m.nome_artistico).join(' & ')}</span>
                       {' '}def.{' '}
-                      {c.perdedor.nome_artistico}
+                      {c.perdedores.filter(Boolean).map((m: any) => m.nome_artistico).join(' & ')}
                     </span>
                     <span className="text-zinc-500">{c.placar}{c.lavada ? ' 🔥' : ''}</span>
                   </div>
